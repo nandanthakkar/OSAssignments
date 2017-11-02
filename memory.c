@@ -17,7 +17,7 @@ typedef struct _memNode {
 static char firstTimeMalloc=1;
 
 //1 million bytes
-static char memory[1000000];
+static char* memory;
 
 
 //4096 bytes
@@ -49,6 +49,9 @@ void * myallocate(size_t size, int FILE, int LINE, int THREADREQ) {
 
 		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
+
+		memory=posix_memalign(&memory,pageSize,1048576);
+
 
 		//Make sure this if statement never fires again
 		firstTimeMalloc=0;
