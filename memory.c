@@ -85,5 +85,5 @@ void * myallocate(size_t size, int FILE, int LINE, int THREADREQ) {
 
 
 void main() {
-	int j=1;
+	int j=7;
 }
