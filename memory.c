@@ -17,7 +17,8 @@ typedef struct _memNode {
 static char firstTimeMalloc=1;
 
 //1 million bytes
-static char* memory;
+static void* memory;
+//NOTE:made this void* to get rid of warnings, can be changed back if needed - Steve 11-9-2017, 9:10AM
 
 
 //4096 bytes
@@ -42,7 +43,17 @@ static int OSLeftBlock;
 //Size of segment for pageNodes
 static int OSRightBlock;
 
-void * myallocate(size_t size, int FILE, int LINE, int THREADREQ) {
+
+//error function to print message and exit
+void fatalError(int line, char* file) {
+	printf("Error:\n");
+	//TODO: add error message
+	printf("Line number= %i \nFile= %s\n", line, file);
+	exit(-1);
+}
+
+//NOTE: argument 2 changed to char* from int -Steve 11-9-2017 9:23AM
+void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
@@ -50,8 +61,10 @@ void * myallocate(size_t size, int FILE, int LINE, int THREADREQ) {
 		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
 
-		memory=posix_memalign(&memory,pageSize,1048576);
-
+		int x=posix_memalign(&memory,pageSize,1048576);
+		if(x != 0) {
+			fatalError(__LINE__, __FILE__);
+		}
 
 		//Make sure this if statement never fires again
 		firstTimeMalloc=0;
@@ -69,21 +82,18 @@ void * myallocate(size_t size, int FILE, int LINE, int THREADREQ) {
 
 		//Lef block shold be set up now
 
-		//****************
-
+		//*****************************************************************
 
 		//Set up right block
-
 		pageNode mainPageNode= {1,0,0};
-
 		memcpy(memory+OSLeftBlock,&mainPageNode,sizeof(pageNode));
-
-
 	}
-
 }
 
 
 void main() {
 	int j=7;
+
+	myallocate(10, __FILE__, __LINE__, 0);
+
 }
