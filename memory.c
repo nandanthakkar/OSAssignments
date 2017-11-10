@@ -7,6 +7,7 @@ typedef struct _pageNode {
 	char inUse;
 	int threadId;
 	int pageId;
+	int swapFileOffset;
 } pageNode;
 
 typedef struct _memNode {
@@ -16,7 +17,6 @@ typedef struct _memNode {
 
 static char firstTimeMalloc=1;
 
-//1 million bytes
 static void* memory;
 //NOTE:made this void* to get rid of warnings, can be changed back if needed - Steve 11-9-2017, 9:10AM
 
@@ -25,14 +25,28 @@ static void* memory;
 static int pageSize;
 
 //stack size of each thead;
-static int stackSize=12000;
+static int stackSize=64000;
 
 //968 bytes
 static int tcbSize=(sizeof(tcb));
 
-static int threadLimit=10;
+static int threadLimit=32;
 
-static int pageLimit=10;
+static int leftBlockPageNumber=512;
+
+static int rightBlockPageNumber=24;
+
+static int sharedRegionPageNumber=4;
+
+static int freePagesBufferNumber=3;
+
+static int totalPagesInMemory=2048;
+
+static int TotalPagesMemoryAndSwapFile=6144;
+
+static int totalBytes=25165824;
+
+static int bytesMemory=8388608;
 
 //Size of segment of memory dedicated to pageNodes and mallocs from the phtread library
 static int osSize;
@@ -58,6 +72,10 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
 
+		//printf("Page Node Size: %d\n",sizeof(pageNode));
+		//printf("Mem Node Size: %d\n",sizeof(memNode));
+		//printf("TCB Size: %d\n",tcbSize);
+
 		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
 
@@ -68,11 +86,6 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 		//Make sure this if statement never fires again
 		firstTimeMalloc=0;
-
-		//Calculate size of left and right block. Add the two to get the total os size
-		OSLeftBlock=threadLimit*(sizeof(memNode)+stackSize+tcbSize);
-		OSRightBlock=pageLimit*sizeof(pageNode);
-		osSize=OSLeftBlock+OSRightBlock;
 
 		//Create a node to manage the free space in the left block
 		memNode OSNode1={0,OSLeftBlock-sizeof(memNode)};
@@ -86,7 +99,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 		//Set up right block
 		pageNode mainPageNode= {1,0,0};
-		memcpy(memory+OSLeftBlock,&mainPageNode,sizeof(pageNode));
+		memcpy(memory+leftBlockPageNumber*pageSize,&mainPageNode,sizeof(pageNode));
 	}
 }
 
