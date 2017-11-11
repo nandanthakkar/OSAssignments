@@ -4,10 +4,13 @@
 #include "my_pthread_t.h"
 
 typedef struct _pageNode {
-	char inUse;
+	//Size of largest free mmeory segment in the page. If -1, used for a request that spanned multiple pages
+	//Can't use for any other requests. If other negative number, no page in use
+	int largestFreeMemory;
 	int threadId;
 	int pageId;
-	int swapFileOffset;
+	//Negative means in swap file. Positive means in memory. Offsets start at 1 not 0
+	int offset;
 } pageNode;
 
 typedef struct _memNode {
@@ -88,18 +91,24 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 		firstTimeMalloc=0;
 
 		//Create a node to manage the free space in the left block
-		memNode OSNode1={0,OSLeftBlock-sizeof(memNode)};
+		memNode OSNode1={0,leftBlockPageNumber*pageSize-sizeof(memNode)};
 
 		//Copy that node into the memory array
 		memcpy(memory,&OSNode1,sizeof(memNode));
 
 		//Lef block shold be set up now
+		//Left block contains memory allocated by the my_pthread library
+		//Right block contains pageNodes
 
 		//*****************************************************************
 
 		//Set up right block
-		pageNode mainPageNode= {1,0,0};
+		pageNode mainPageNode= {1,0,0,1};
 		memcpy(memory+leftBlockPageNumber*pageSize,&mainPageNode,sizeof(pageNode));
+
+		//initialize actualt page with a memNode
+
+
 	}
 }
 
