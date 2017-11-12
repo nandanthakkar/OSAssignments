@@ -45,6 +45,10 @@ static int freePagesBufferNumber=3;
 
 static int totalPagesInMemory=2048;
 
+static int totalPagesUser=1509;
+
+static int alwaysFreePages=3;
+
 static int totalPagesMemoryAndSwapFile=6144;
 
 static int totalBytes=25165824;
@@ -53,20 +57,20 @@ static int bytesMemory=8388608;
 
 
 //Size of segment for mallocs from pthread library
-static int OSLeftBlockSize=leftBlockPageNumber*pageSize;
+static int OSLeftBlockSize;
 
 //Size of segment for pageNodes
-static int OSRightBlockSize=rightBlockPageNumber*pageSize;
+static int OSRightBlockSize;
 
 //Size of segment of memory dedicated to pageNodes and mallocs from the phtread library
-static int OSSize=OSLeftBlockSize+OSRightBlockSize;
+static int OSSize;
 
 //Size of free memory when a new page is allocated
-static int freshPageFreeSize=pageSize-sizeof(memNode);
+static int freshPageFreeSize;
 
-static void* rightBlockStart=memory+leftBlockPageNumber*pageSize;
+static void* rightBlockStart;
 
-static void* pageSpaceStart=rightBlockStart+rightBlockPageNumber*pageSize;
+static void* pageSpaceStart;
 
 
 //error function to print message and exit
@@ -77,23 +81,30 @@ void fatalError(int line, char* file) {
 	exit(-1);
 }
 
+void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr);
+
 //NOTE: argument 2 changed to char* from int -Steve 11-9-2017 9:23AM
 void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
 
-		//printf("Page Node Size: %d\n",sizeof(pageNode));
-		//printf("Mem Node Size: %d\n",sizeof(memNode));
-		//printf("TCB Size: %d\n",tcbSize);
-
 		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
 
-		int x=posix_memalign(&memory,pageSize,1048576);
+		int x=posix_memalign(&memory,pageSize,bytesMemory);
 		if(x != 0) {
 			fatalError(__LINE__, __FILE__);
 		}
+
+
+		OSLeftBlockSize=leftBlockPageNumber*pageSize;
+		OSRightBlockSize=rightBlockPageNumber*pageSize;
+		OSSize=OSLeftBlockSize+OSRightBlockSize;
+		freshPageFreeSize=pageSize-sizeof(memNode);
+		rightBlockStart=memory+leftBlockPageNumber*pageSize;
+		pageSpaceStart=rightBlockStart+rightBlockPageNumber*pageSize;
+
 
 		//Make sure this if statement never fires again
 		firstTimeMalloc=0;
@@ -102,7 +113,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 		memNode OSNode1={0,leftBlockPageNumber*pageSize-sizeof(memNode)};
 
 		//Copy that node into the memory array
-		*memory=OSNode1;
+		*((memNode*)memory)=OSNode1;
 
 		//Lef block shold be set up now
 		//Left block contains memory allocated by the my_pthread library
@@ -110,43 +121,50 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 		//*****************************************************************
 
-		void* currentPageNode=rightBlockStart;
+		pageNode* currentPageNode=(pageNode*)rightBlockStart;
+
 
 		//Set up right block
 		pageNode mainPageNode= {freshPageFreeSize,1,1,1};
 		*currentPageNode=mainPageNode;
 
 		//initialize actual page with a memNode
-		void* currentPage=pageSpaceStart;
+		memNode* currentPage=(memNode*)pageSpaceStart;
 		memNode firstPageMemNode={0,freshPageFreeSize};
 		*currentPage=firstPageMemNode;
+
 
 		int pageNodeCreatedCounter=1;
 
 		//adress of the current page node to be created
-		currentPageNode+=sizeof(pageNode);
+		currentPageNode+=1;
 
-		currentPage+=pageSize;
+
+		currentPage=(memNode*)((char*)currentPage+pageSize);
+
 
 		//loop through the pageNodes for pages in memory and initalize the pageNodes as well as their pages
-		while(pageNodeCreatedCounter<totalPagesInMemory) {
+		while(pageNodeCreatedCounter<totalPagesUser) {
+
 			pageNode newPageNode={-2,0,0,1+pageSize*pageNodeCreatedCounter};
 			*currentPageNode=newPageNode;
 
 			memNode newMemNode={0,freshPageFreeSize};
 			*currentPage=newMemNode;
 
-			currentPage+=pageSize;
-			currentPageNode+=pageSize;
+
+			currentPage=(memNode*)((char*)currentPage+pageSize);
+			currentPageNode+=1;
 			pageNodeCreatedCounter++;
+
 		}
 
 		//Initialize the pageNodes of pages not in memory
-		while(pageNodeCreatedCounter<totalPagesMemoryAndSwapFile) {
+		while(pageNodeCreatedCounter<totalPagesMemoryAndSwapFile - totalPagesUser) {
 			pageNode newPageNode={-2,0,0,0};
 			*currentPageNode=newPageNode;
 
-			currentPageNode+=pageSize;
+			currentPageNode+=1;
 			pageNodeCreatedCounter++;
 		}
 
@@ -159,7 +177,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 		memNode* cursor=(memNode*)memory;
 
 		//Loop through the entire left block
-		while(cursor<mmeory+OSLeftBlockSize) {
+		while(cursor<(memNode*)(memory+OSLeftBlockSize)) {
 
 			//If the block is being used skip
 			if(cursor->inUse==1) {
@@ -218,24 +236,24 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 		if(size<=freshPageFreeSize) {
 
 			//Loop through all pageNodes
-			while(pageCounter<totalPagesInMemoryAndSwapFile) {
+			while(pageCounter<totalPagesMemoryAndSwapFile) {
 
 				//If you find a pageNode with correspoding threadId
 				if(currentPageNode->threadId==getCurrentThread()) {
 
 					//In memory and there is space available in the page
-					if(currentPageNode->offset>0&&largestFreeMemory>=size) {
+					if(currentPageNode->offset>0&&currentPageNode->largestFreeMemory>=size) {
 
 						//allocate the memory
-						return pageSpaceStart+pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+						return pageSpaceStart+(currentPageNode->pageId-1)*pageSize+(long)(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
 					}
 
 					//In swap file and there is space avaible
-					else if (currentPageNode->offset<0&&largestFreeMemory>=size) {
+					else if (currentPageNode->offset<0&&currentPageNode->largestFreeMemory>=size) {
 						//bring page from swap file into memory
 
 						//allocte the memory
-						return pageSpaceStart+pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+						return pageSpaceStart+(currentPageNode->pageId-1)*pageSize+(long)(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
 					}
 
 					//Page count needs to be incremented
@@ -254,7 +272,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 			currentPageNode=(pageNode*)rightBlockStart;
 
 			//Loop through all pageNodes
-			while(pageCounter<totalPagesMemoryAndSwapFile) {
+			while(pageCounter<totalPagesMemoryAndSwapFile - totalPagesUser - alwaysFreePages) {
 
 				//pageNode is free
 				if(currentPageNode->threadId==0) {
@@ -271,7 +289,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 					}
 
 					//allocate the memory
-					return pageSpaceStart+pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+					return pageSpaceStart+(currentPageNode->pageId-1)*pageSize+(long)(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
 				}
 
 			}
@@ -280,7 +298,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 			return NULL;
 		}
 
-		//Request will span more than two pages
+		//Request will span two or more pages
 		else {
 
 			//Last Page Node allocated to the thread
@@ -324,7 +342,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 	void* endOfPage=(void*)cursor+pageSize;
 
 
-	while(cursor<endOfPage) {
+	while(cursor<(memNode*)endOfPage) {
 
 			//If the memNode is in use skip
 			if(cursor->inUse==1) {
@@ -352,7 +370,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 
 				//loop through page and find the largest free region and update the pageNode
 				int largestFreeMemory=0;
-				while(ptr<endOfPage) {
+				while(ptr<(memNode*)endOfPage) {
 					if(ptr->inUse==0) {
 						if(ptr->size>largestFreeMemory) {
 							largestFreeMemory=ptr->size;
@@ -373,9 +391,12 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 				cursor->inUse=1;
 				cursor->size=size;
 
+				//Jump back to start of page
+				memNode* ptr=(memNode*)pageSpaceStart+pageNodePtr->offset;
+
 				//loop through page and find the largest free region and update the pageNode
 				int largestFreeMemory=0;
-				while(ptr<endOfPage) {
+				while(ptr<(memNode*)endOfPage) {
 					if(ptr->inUse==0) {
 						if(ptr->size>largestFreeMemory) {
 							largestFreeMemory=ptr->size;
@@ -386,7 +407,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 				pageNodePtr->largestFreeMemory=largestFreeMemory;
 
 				//return the adress of the allocation
-				return (void *) (cursor+1);
+				return (void*) (cursor+1);
 			}
 
 			//jump to the next memNode
