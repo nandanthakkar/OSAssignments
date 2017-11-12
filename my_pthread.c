@@ -35,6 +35,9 @@ void schedule(int x);
 void maintenance() ;
 
 
+int getCurrentThread() {
+  return (int)currentThread;
+}
 
 
 /******************************************************************************/
