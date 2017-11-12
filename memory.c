@@ -73,6 +73,11 @@ static void* rightBlockStart;
 static void* pageSpaceStart;
 
 
+//function to swap pages from memory to file
+int swap(pageNode* toSwap, pageNode* toMemory) {
+	
+}
+
 //error function to print message and exit
 void fatalError(int line, char* file) {
 	printf("Error:\n");
@@ -259,7 +264,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 					//Page count needs to be incremented
 					pageCount++;
 				}
-				
+
 				//Jump to the next page node
 				currentPageNode+=1;
 
