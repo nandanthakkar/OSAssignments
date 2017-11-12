@@ -227,7 +227,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 					if(currentPageNode->offset>0&&largestFreeMemory>=size) {
 
 						//allocate the memory
-						return pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+						return pageSpaceStart+pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
 					}
 
 					//In swap file and there is space avaible
@@ -235,7 +235,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 						//bring page from swap file into memory
 
 						//allocte the memory
-						return pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+						return pageSpaceStart+pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
 					}
 
 					//Page count needs to be incremented
@@ -271,7 +271,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 					}
 
 					//allocate the memory
-					return pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+					return pageSpaceStart+pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
 				}
 
 			}
@@ -293,6 +293,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 						highestPageId=currentPageNode;
 					}
 				}
+
 				currentPageNode+=1;
 				pageCounter++;
 			}
