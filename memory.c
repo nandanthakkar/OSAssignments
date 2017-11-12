@@ -45,20 +45,28 @@ static int freePagesBufferNumber=3;
 
 static int totalPagesInMemory=2048;
 
-static int TotalPagesMemoryAndSwapFile=6144;
+static int totalPagesMemoryAndSwapFile=6144;
 
 static int totalBytes=25165824;
 
 static int bytesMemory=8388608;
 
-//Size of segment of memory dedicated to pageNodes and mallocs from the phtread library
-static int osSize;
 
 //Size of segment for mallocs from pthread library
-static int OSLeftBlock;
+static int OSLeftBlockSize=leftBlockPageNumber*pageSize;
 
 //Size of segment for pageNodes
-static int OSRightBlock;
+static int OSRightBlockSize=rightBlockPageNumber*pageSize;
+
+//Size of segment of memory dedicated to pageNodes and mallocs from the phtread library
+static int OSSize=OSLeftBlockSize+OSRightBlockSize;
+
+//Size of free memory when a new page is allocated
+static int freshPageFreeSize=pageSize-sizeof(memNode);
+
+static void* rightBlockStart=memory+leftBlockPageNumber*pageSize;
+
+static void* pageSpaceStart=rightBlockStart+rightBlockPageNumber*pageSize;
 
 
 //error function to print message and exit
@@ -94,7 +102,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 		memNode OSNode1={0,leftBlockPageNumber*pageSize-sizeof(memNode)};
 
 		//Copy that node into the memory array
-		memcpy(memory,&OSNode1,sizeof(memNode));
+		*memory=OSNode1;
 
 		//Lef block shold be set up now
 		//Left block contains memory allocated by the my_pthread library
@@ -102,14 +110,291 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 		//*****************************************************************
 
+		void* currentPageNode=rightBlockStart;
+
 		//Set up right block
-		pageNode mainPageNode= {1,0,0,1};
-		memcpy(memory+leftBlockPageNumber*pageSize,&mainPageNode,sizeof(pageNode));
+		pageNode mainPageNode= {freshPageFreeSize,1,1,1};
+		*currentPageNode=mainPageNode;
 
-		//initialize actualt page with a memNode
+		//initialize actual page with a memNode
+		void* currentPage=pageSpaceStart;
+		memNode firstPageMemNode={0,freshPageFreeSize};
+		*currentPage=firstPageMemNode;
 
+		int pageNodeCreatedCounter=1;
+
+		//adress of the current page node to be created
+		currentPageNode+=sizeof(pageNode);
+
+		currentPage+=pageSize;
+
+		//loop through the pageNodes for pages in memory and initalize the pageNodes as well as their pages
+		while(pageNodeCreatedCounter<totalPagesInMemory) {
+			pageNode newPageNode={-2,0,0,1+pageSize*pageNodeCreatedCounter};
+			*currentPageNode=newPageNode;
+
+			memNode newMemNode={0,freshPageFreeSize};
+			*currentPage=newMemNode;
+
+			currentPage+=pageSize;
+			currentPageNode+=pageSize;
+			pageNodeCreatedCounter++;
+		}
+
+		//Initialize the pageNodes of pages not in memory
+		while(pageNodeCreatedCounter<totalPagesMemoryAndSwapFile) {
+			pageNode newPageNode={-2,0,0,0};
+			*currentPageNode=newPageNode;
+
+			currentPageNode+=pageSize;
+			pageNodeCreatedCounter++;
+		}
 
 	}
+
+	//Library called malloc
+	if(THREADREQ==0) {
+
+		//The start of the os left block
+		memNode* cursor=(memNode*)memory;
+
+		//Loop through the entire left block
+		while(cursor<mmeory+OSLeftBlockSize) {
+
+			//If the block is being used skip
+			if(cursor->inUse==1) {
+				cursor=(memNode*)((char*)cursor+cursor->size+sizeof(memNode));
+				continue;
+			}
+
+			//origina size that was available
+			int originalSize=cursor->size;
+
+			//If there is room for the allocation plus a memNode with a size of 1
+			if(originalSize>=size+sizeof(memNode)+1) {
+
+				//Update cursor to refer to the new allocation
+				cursor->size=size;
+				cursor->inUse=1;
+
+				//Create a new memode for remaining free space
+				memNode* newMemNodePtr=(memNode*)((char*)cursor+sizeof(memNode)+size);
+				newMemNodePtr->size=originalSize-size-sizeof(memNode);
+				newMemNodePtr->inUse=0;
+
+				//return the adress of the allocation
+				return (void*)(cursor+1);
+			}
+
+			//If there is only room for the allocation update the memNode to refer to the new allocation and return the adress
+			//of the new allocation
+			else if(originalSize>=size){
+				cursor->inUse=1;
+				return (void *) (cursor+1);
+			}
+
+			//jump to the next memNode
+			cursor=(memNode*)((char*)cursor+sizeof(memNode)+cursor->size);
+		}
+
+		//If no space available return NULL
+		return NULL;
+
+	}
+
+	//User made call to malloc
+	else {
+
+		//Start of pageNodes
+		pageNode* currentPageNode=(pageNode*)rightBlockStart;
+
+		//Count of pageNodes seen with corresponding threadId
+		int pageCount=0;
+
+		//Count of all pages seen
+		int pageCounter=0;
+
+		//If the allocation can fit inside one page
+		if(size<=freshPageFreeSize) {
+
+			//Loop through all pageNodes
+			while(pageCounter<totalPagesInMemoryAndSwapFile) {
+
+				//If you find a pageNode with correspoding threadId
+				if(currentPageNode->threadId==getCurrentThread()) {
+
+					//In memory and there is space available in the page
+					if(currentPageNode->offset>0&&largestFreeMemory>=size) {
+
+						//allocate the memory
+						return pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+					}
+
+					//In swap file and there is space avaible
+					else if (currentPageNode->offset<0&&largestFreeMemory>=size) {
+						//bring page from swap file into memory
+
+						//allocte the memory
+						return pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+					}
+
+					//Page count needs to be incremented
+					pageCount++;
+				}
+				
+				//Jump to the next page node
+				currentPageNode+=1;
+
+				//Increment the number of pages seen
+				pageCounter++;
+			}
+
+			//Re-initialize these variable since loop starts from beginning again
+			pageCounter=0;
+			currentPageNode=(pageNode*)rightBlockStart;
+
+			//Loop through all pageNodes
+			while(pageCounter<totalPagesMemoryAndSwapFile) {
+
+				//pageNode is free
+				if(currentPageNode->threadId==0) {
+
+					//Set its thread, pageId, and largestFreeMemory
+					currentPageNode->threadId=getCurrentThread();
+					currentPageNode->pageId=pageCount;
+					currentPageNode->largestFreeMemory=freshPageFreeSize;
+
+					//If the pageNode refers to a page not in memory than bring it into memory and initialize the page
+					if(currentPageNode->offset<0) {
+						//bring page form swap file to memory
+						//initialize page
+					}
+
+					//allocate the memory
+					return pageId*pageSize+(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+				}
+
+			}
+
+			//If all pageNodes used, no more memory to allocate
+			return NULL;
+		}
+
+		//Request will span more than two pages
+		else {
+
+			//Last Page Node allocated to the thread
+			pageNode* highestPageId=NULL;
+
+			//Find the highest pageId allocated to the thread
+			while(pageCounter<totalPagesMemoryAndSwapFile) {
+				if(currentPageNode->threadId==getCurrentThread()) {
+					if(highestPageId==NULL||currentPageNode->pageId>highestPageId->threadId) {
+						highestPageId=currentPageNode;
+					}
+				}
+				currentPageNode+=1;
+				pageCounter++;
+			}
+
+			//No page has been allocated to the thread
+			if(highestPageId==NULL) {
+				//Needs to be completed
+			}
+
+			else {
+				//Needs to be completed
+			}
+
+		}
+
+	}
+}
+
+/*
+	Function to service a malloc request after the correct page has already been identified
+*/
+void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
+
+	//location of beginning of page
+	memNode* cursor=(memNode*)pageSpaceStart+pageNodePtr->offset;
+
+	//location of end of page
+	void* endOfPage=(void*)cursor+pageSize;
+
+
+	while(cursor<endOfPage) {
+
+			//If the memNode is in use skip
+			if(cursor->inUse==1) {
+				cursor=(memNode*)((char*)cursor+cursor->size+sizeof(memNode));
+				continue;
+			}
+
+			//original size that was free
+			int originalSize=cursor->size;
+
+			//If there is room for the allocation plus a memNode with a size of 1
+			if(originalSize>=size+sizeof(memNode)+1) {
+
+				//Update the memNode
+				cursor->size=size;
+				cursor->inUse=1;
+
+				//Create new memode for the remaining free space
+				memNode* newMemNodePtr=(memNode*)((char*)cursor+sizeof(memNode)+size);
+				newMemNodePtr->size=originalSize-size-sizeof(memNode);
+				newMemNodePtr->inUse=0;
+
+				//Jump back to start of page
+				memNode* ptr=(memNode*)pageSpaceStart+pageNodePtr->offset;
+
+				//loop through page and find the largest free region and update the pageNode
+				int largestFreeMemory=0;
+				while(ptr<endOfPage) {
+					if(ptr->inUse==0) {
+						if(ptr->size>largestFreeMemory) {
+							largestFreeMemory=ptr->size;
+						}
+					}
+				}
+
+				pageNodePtr->largestFreeMemory=largestFreeMemory;
+
+				//return the address of the allocation
+				return (void*)(cursor+1);
+			}
+
+			//Only room for the allocation
+			else if(originalSize>=size){
+
+				//Update the memNode
+				cursor->inUse=1;
+				cursor->size=size;
+
+				//loop through page and find the largest free region and update the pageNode
+				int largestFreeMemory=0;
+				while(ptr<endOfPage) {
+					if(ptr->inUse==0) {
+						if(ptr->size>largestFreeMemory) {
+							largestFreeMemory=ptr->size;
+						}
+					}
+				}
+
+				pageNodePtr->largestFreeMemory=largestFreeMemory;
+
+				//return the adress of the allocation
+				return (void *) (cursor+1);
+			}
+
+			//jump to the next memNode
+			cursor=(memNode*)((char*)cursor+sizeof(memNode)+cursor->size);
+		}
+
+		//Return null if no room in page. This should never happen
+		return NULL;
+
 }
 
 
