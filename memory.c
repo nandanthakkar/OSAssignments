@@ -4,7 +4,7 @@
 #include "my_pthread_t.h"
 
 typedef struct _pageNode {
-	//Size of largest free mmeory segment in the page. If -1, used for a request that spanned multiple pages
+	//Size of largest free memory segment in the page. If -1, used for a request that spanned multiple pages
 	//Can't use for any other requests. If other negative number, no page in use
 	int largestFreeMemory;
 	int threadId;
@@ -164,9 +164,11 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 		}
 
+		int numNodesInMemory=pageNodeCreatedCounter;
+
 		//Initialize the pageNodes of pages not in memory
 		while(pageNodeCreatedCounter<totalPagesMemoryAndSwapFile - totalPagesUser) {
-			pageNode newPageNode={-2,0,0,0};
+			pageNode newPageNode={-2,0,0,-1 - (pageNodeCreatedCounter-numNodesInMemory)*pageSize};
 			*currentPageNode=newPageNode;
 
 			currentPageNode+=1;
@@ -272,6 +274,10 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 				pageCounter++;
 			}
 
+			if(pageCount>=totalPagesUser) {
+				return NULL;
+			}
+
 			//Re-initialize these variable since loop starts from beginning again
 			pageCounter=0;
 			currentPageNode=(pageNode*)rightBlockStart;
@@ -321,13 +327,175 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 				pageCounter++;
 			}
 
+
+
 			//No page has been allocated to the thread
 			if(highestPageId==NULL) {
-				//Needs to be completed
+
+				//The number of pages thar are going to have to be allocated for the request
+				int newPagesNum=(size+sizeof(memNode))/pageSize;
+
+				//If the total request won't be able to fit into memory at one time return null
+				if(newPagesNum>totalPagesUser) {
+					return NULL;
+				}
+
+				//Array of pageNode* to hold the free pageNodes that are found
+				pageNode* freeNodes[newPagesNum];
+
+				//Counter for the while loop
+				int pageCounter=0;
+
+				//Current page node
+				pageNode* currentPageNode=(pageNode*)rightBlockStart;
+
+				//index for the array of pageNode*
+				int index=0;
+
+				//loop through all the pageNodes
+				while(pageCounter<totalPagesMemoryAndSwapFile - totalPagesUser - alwaysFreePages) {
+
+					//If a free pageNode is found, save it to the array
+					if(currentPageNode->largestFreeMemory<-1) {
+						freeNodes[index]=currentPageNode;
+						index++;
+					}
+
+					//If the array is full break
+					if(index>=newPagesNum) {
+						break;
+					}
+
+
+					currentPageNode=currentPageNode+1;
+					pageCounter++;
+				}
+
+				//Not enough memory left for request reurn null
+				if(index<newPagesNum) {
+					return NULL;
+				}
+
+				//The first page node is special because its page holds a memNode
+				pageNode* firstPageNode=freeNodes[0];
+
+				//Initialize the pageNode
+				firstPageNode->threadId=getCurrentThread();
+				firstPageNode->pageId=1;
+				firstPageNode->largestFreeMemory=-1;
+
+				//If the page is not in memory bring it into memory
+				if(firstPageNode->offset<0) {
+					//swap into memory
+				}
+
+				//Start of the page in memory
+				memNode* startOfPage=(memNode*)((char*)pageSpaceStart+firstPageNode->offset);
+
+				//Initialize the memNode
+				startOfPage->inUse=1;
+				startOfPage->size=size;
+
+				int i=1;
+
+				//Initialize  the rest of the memNodes and bring them into memory if necessary
+				for(i;i<newPagesNum;i++) {
+					pageNode* pgNode=freeNodes[i];
+					pgNode->threadId=getCurrentThread();
+					pgNode->largestFreeMemory=-1;
+					pgNode->pageId=i+1;
+
+					if(pgNode->offset<0) {
+						//swap into memory
+					}
+				}
+
+				//Return the address of the first page in memory
+				return pageSpaceStart+sizeof(memNode);
+
+
+
 			}
 
 			else {
-				//Needs to be completed
+				int newPagesNum=(size+sizeof(memNode))/pageSize;
+
+				if(newPagesNum+highestPageId->pageId>totalPagesUser) {
+					return NULL;
+				}
+
+
+				//Array of pageNode* to hold the free pageNodes that are found
+				pageNode* freeNodes[newPagesNum];
+
+				//Counter for the while loop
+				int pageCounter=0;
+
+				//Current page node
+				pageNode* currentPageNode=(pageNode*)rightBlockStart;
+
+				//index for the array of pageNode*
+				int index=0;
+
+				//loop through all the pageNodes
+				while(pageCounter<totalPagesMemoryAndSwapFile - totalPagesUser - alwaysFreePages) {
+
+					//If a free pageNode is found, save it to the array
+					if(currentPageNode->largestFreeMemory<-1) {
+						freeNodes[index]=currentPageNode;
+						index++;
+					}
+
+					//If the array is full break
+					if(index>=newPagesNum) {
+						break;
+					}
+
+
+					currentPageNode=currentPageNode+1;
+					pageCounter++;
+				}
+
+				//Not enough memory left for request reurn null
+				if(index<newPagesNum) {
+					return NULL;
+				}
+
+				//The first page node is special because its page holds a memNode
+				pageNode* firstPageNode=freeNodes[0];
+
+				//Initialize the pageNode
+				firstPageNode->threadId=getCurrentThread();
+				firstPageNode->pageId=highestPageId->pageId+1;
+				firstPageNode->largestFreeMemory=-1;
+
+				//If the page is not in memory bring it into memory
+				if(firstPageNode->offset<0) {
+					//swap into memory
+				}
+
+				//Start of the page in memory
+				memNode* startOfPage=(memNode*)((char*)pageSpaceStart+firstPageNode->offset);
+
+				//Initialize the memNode
+				startOfPage->inUse=1;
+				startOfPage->size=size;
+
+				int i=1;
+
+				//Initialize  the rest of the memNodes and bring them into memory if necessary
+				for(i;i<newPagesNum;i++) {
+					pageNode* pgNode=freeNodes[i];
+					pgNode->threadId=getCurrentThread();
+					pgNode->largestFreeMemory=-1;
+					pgNode->pageId=highestPageId->pageId+1;
+					if(pgNode->offset<0) {
+						//swap into memory
+					}
+				}
+
+				return pageSpaceStart+(pageSize-1)*firstPageNode->pageId+sizeof(memNode);
+
 			}
 
 		}
