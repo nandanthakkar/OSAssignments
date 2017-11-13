@@ -74,9 +74,32 @@ static void* pageSpaceStart;
 
 
 //function to swap pages from memory to file
-int swap(pageNode* toSwap, pageNode* toMemory) {
-	
+//swap function that swaps pages
+int swap(pageNode* inMem, pageNode* inSwap) {
+	printf("start swap function\n");
+
+	//index of the memory location used as a temp location to swap
+	int tempIndex=8000000 - (pageSize * 7);
+
+	//copy memory page into temp memory page
+	memcpy(memory + tempIndex, memory + inMem->offset - 1, pageSize);
+
+	//read from swap into to Memory
+	lseek(fd, (-1)*inSwap->offset, SEEK_CUR);
+	read(fd, memory + inMem->offset, pageSize);
+	lseek(fd, SEEK_CUR - 1, 0);
+
+	//write temp into swap
+	write(fd, memory + tempIndex, pageSize);
+	lseek(fd, SEEK_CUR - 1, 0);
+
+	//update Offsets
+	//remember inMem is now in swap and inSwap is now in mem
+	inMem->offset=(-1)*inMem->offset;
+	inSwap->offset=(inSwap->pageId - 1) * (pageSize + 1);
+  return 0;
 }
+
 
 //error function to print message and exit
 void fatalError(int line, char* file) {
@@ -89,7 +112,7 @@ void fatalError(int line, char* file) {
 int memAlignPages(int threadID){
 	//count pages align
 	pageidCounter = 1;
-	
+
 	//temp pageNode to find all pages of given thread
 	_pageNode * pageNodeAddr = (_pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
@@ -99,16 +122,16 @@ int memAlignPages(int threadID){
 			pageidCounter++;
 			//if page node we  need to align is in memory
 			if(pageNodeAddr->offset > 0){
-				
+
 				//create temp page node to find if space where we want align if free or occupied
 				_pageNode * pageTemp = (_pageNode *)rightBlockStart;
-				
+
 				// created to find if space where we want to align  is occupied.
 				char isOccupied = 0;
-				
+
 				//find page node for space where we want to align
 				while(pageTemp < (char *)rightBlockStart + OSRightBlockSize){
-					
+
 					// if found a
 					if(pageTemp->offset == ((pageNodeAddr->pageId)+1)){
 						memcpy((void*)(memory + bytesMemory - pageSize*7), (void*)(memory + ((pageTemp->offset) - 1) * pageSize), pageSize);
@@ -120,15 +143,15 @@ int memAlignPages(int threadID){
 						pageNodeAddr->offset = offsetTemp;
 						isOccupied = 1;
 					}
-					
+
 					pageTemp++;
 				}
-				
+
 				if(!isOccupied){
 					memcpy((void*)(memory + (pageNodeAddr->pageId - 1) * pageSize),(void*)(memory + pageNodeAddr->offset*(-1) + 1));
 				}
 			}
-			
+
 			if(pageNodeAddr->offset < 0){
 				_pageNode * pageTemp = (_pageNode *)rightBlockStart;
 				char isOccupied = 0;
@@ -143,7 +166,7 @@ int memAlignPages(int threadID){
 					}
 					pageTemp++;
 				}
-				
+
 				if(!isOccupied){
 					int i = swap(pageNodeAddr, NULL);
 					if(i == 0){
