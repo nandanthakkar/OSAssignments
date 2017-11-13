@@ -335,6 +335,7 @@ void threadComplete() {
   	}
   }
 
+  free((temp->context).uc_stack.ss_sp); 
   ucontext_t tempContext;
   getcontext(&tempContext);
   swapcontext(&tempContext,&schedulerContext);
