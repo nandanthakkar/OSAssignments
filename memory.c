@@ -687,6 +687,55 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 
 }
 
+void* shalloc(size_t size) {
+
+
+		//The start of the shared space
+		memNode* cursor=(memNode*)(memory+(totalPagesInMemory-4)*pageSize);
+
+		//Loop through the entire left block
+		while(cursor<(memNode*)(memory+totalPagesInMemory*pageSize)) {
+
+			//If the block is being used skip
+			if(cursor->inUse==1) {
+				cursor=(memNode*)((char*)cursor+cursor->size+sizeof(memNode));
+				continue;
+			}
+
+			//origina size that was available
+			int originalSize=cursor->size;
+
+			//If there is room for the allocation plus a memNode with a size of 1
+			if(originalSize>=size+sizeof(memNode)+1) {
+
+				//Update cursor to refer to the new allocation
+				cursor->size=size;
+				cursor->inUse=1;
+
+				//Create a new memode for remaining free space
+				memNode* newMemNodePtr=(memNode*)((char*)cursor+sizeof(memNode)+size);
+				newMemNodePtr->size=originalSize-size-sizeof(memNode);
+				newMemNodePtr->inUse=0;
+
+				//return the adress of the allocation
+				return (void*)(cursor+1);
+			}
+
+			//If there is only room for the allocation update the memNode to refer to the new allocation and return the adress
+			//of the new allocation
+			else if(originalSize>=size){
+				cursor->inUse=1;
+				return (void *) (cursor+1);
+			}
+
+			//jump to the next memNode
+			cursor=(memNode*)((char*)cursor+sizeof(memNode)+cursor->size);
+		}
+
+		//If no space available return NULL
+		return NULL;	
+}
+
 
 void main() {
 	int j=7;
