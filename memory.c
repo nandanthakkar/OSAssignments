@@ -122,7 +122,7 @@ int memAlignPages(int threadID){
 	//loop to scroll through all page nodes
 	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
 		// if found page of a thread then align it.
-		if(pageNodeAddr->threadId = threadID ){
+		if(pageNodeAddr->threadId = threadID && pageNodeAddr->offset != (pageSpaceStart + ((pageNodeAddr->pageId-1)*pageSize)+1)){
 			
 			//if page node we  need to align is in memory
 			if(pageNodeAddr->offset > 0){
