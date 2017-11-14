@@ -23,6 +23,8 @@ static char firstTimeMalloc=1;
 static void* memory;
 //NOTE:made this void* to get rid of warnings, can be changed back if needed - Steve 11-9-2017, 9:10AM
 
+//file descriptor
+static int fd;
 
 //4096 bytes
 static int pageSize;
@@ -72,21 +74,37 @@ static void* rightBlockStart;
 
 static void* pageSpaceStart;
 
+//error function to print message and exit
+void fatalError(int line, char* file) {
+	printf("Error:\n");
+	printf("ERROR= %i\n", strerror(errno));
+	printf("Line number= %i \nFile= %s\n", line, file);
+	exit(-1);
+}
 
 //function to swap pages from memory to file
 //swap function that swaps pages
 int swap(pageNode* inMem, pageNode* inSwap) {
-	printf("start swap function\n");
+	node* inMem=NULL;
+	node* cursor=NULL;
 
 	//index of the memory location used as a temp location to swap
 	int tempIndex=8000000 - (pageSize * 7);
+
+	//find node in swap
+	cursor=(pageNode*)rightBlockStart;
+	while(cursor < pageSpaceStart){
+		if(cursor->offset == (inSwap->pageId-1) * pageSize + 1) {
+			inMem=cursor;
+		}
+	}
 
 	//copy memory page into temp memory page
 	memcpy(memory + tempIndex, memory + inMem->offset - 1, pageSize);
 
 	//read from swap into to Memory
 	lseek(fd, -1+(-1)*inSwap->offset, SEEK_CUR);
-	read(fd, memory + -1+inMem->offset, pageSize);
+	read(fd, memory + inMem->offset, pageSize);
 	lseek(fd, SEEK_CUR - 1, 0);
 
 	//write temp into swap
@@ -96,17 +114,8 @@ int swap(pageNode* inMem, pageNode* inSwap) {
 	//update Offsets
 	//remember inMem is now in swap and inSwap is now in mem
 	inMem->offset=(-1)*inMem->offset;
-	inSwap->offset=(inSwap->pageId - 1) * (pageSize)+1;
+	inSwap->offset=(inSwap->pageId - 1) * (pageSize) + 1;
   return 0;
-}
-
-
-//error function to print message and exit
-void fatalError(int line, char* file) {
-	printf("Error:\n");
-	//TODO: add error message
-	printf("Line number= %i \nFile= %s\n", line, file);
-	exit(-1);
 }
 
 static void memoryhandler(int sig, siginfo_t *si, void *unused)
@@ -115,27 +124,27 @@ static void memoryhandler(int sig, siginfo_t *si, void *unused)
        }
 
 int memAlignPages(int threadID){
-	
-	
+
+
 	//temp pageNode to find all pages of given thread
 	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
 	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
 		// if found page of a thread then align it.
 		if(pageNodeAddr->threadId = threadID && pageNodeAddr->offset != (pageSpaceStart + ((pageNodeAddr->pageId-1)*pageSize)+1)){
-			
+
 			//if page node we  need to align is in memory
 			if(pageNodeAddr->offset > 0){
-				
+
 				//create temp page node to find if space where we want align if free or occupied
 				pageNode * pageTemp = (pageNode *)rightBlockStart;
-				
+
 				// created to find if space where we want to align  is occupied.
 				char isOccupied = 0;
-				
+
 				//find page node for space where we want to align
 				while((char *)pageTemp < (char *)(rightBlockStart + OSRightBlockSize)){
-					
+
 					// if found a
 					if(pageTemp->offset == (((pageNodeAddr->pageId)-1) * pageSize)+1){
 						memcpy((void*)((char *)memory + bytesMemory - pageSize*7), (void*)((char *)pageSpaceStart + (pageTemp->offset) -1), pageSize);
@@ -147,10 +156,10 @@ int memAlignPages(int threadID){
 						pageNodeAddr->offset = offsetTemp;
 						isOccupied = 1;
 					}
-					
+
 					pageTemp++;
 				}
-				
+
 				if(!isOccupied){
 					perror("did not find pageNode for location to swap to");
 					fatalError(__LINE__,__FILE__);
@@ -158,7 +167,7 @@ int memAlignPages(int threadID){
 					// pagNodeAddr->offset = (int)((pageNodeAddr->pageId - 1) * pageSize) + 1 ;
 				}
 			}
-			
+
 			if(pageNodeAddr->offset < 0){
 				int i = swap(pageNodeAddr);
 				if(i == 0){
@@ -176,9 +185,26 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr);
 
 //NOTE: argument 2 changed to char* from int -Steve 11-9-2017 9:23AM
 void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
-
+	int x=-1;
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
+		//open file
+		fd=open("swapFile.txt", O_RDWR | O_CREAT, 0666);
+		if(fd == -1) {
+			fatalError(__LINE__, __FILE__);
+		}
+
+		//lseek to make file 100 bytes and then set back to beinging
+		x=lseek(fd, 8000000, SEEK_CUR);
+		if(x != 8000000){
+			fatalError(__LINE__, __FILE__);
+		}
+
+		x=lseek(fd, SEEK_CUR - 1, 0);
+		if(x != 0) {
+			fatalError(__LINE__, __FILE__);
+		}
+
 		struct sigaction sa;//put it in header file
         	sa.sa_flags = SA_SIGINFO;
         	sigemptyset(&sa.sa_mask);
@@ -736,7 +762,7 @@ void* shalloc(size_t size) {
 		}
 
 		//If no space available return NULL
-		return NULL;	
+		return NULL;
 }
 
 void mydeallocate(void* address, char* FILE, int LINE) {
@@ -760,7 +786,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
 			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
-			return;	
+			return;
 		}
 
 		//Free ptr
@@ -783,7 +809,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 		//Find the metadata before ptr
 		while(curr!=ptr) {
 			prev=curr;
-			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size); 
+			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size);
 		}
 
 		//If the metadata prev pointer is free, combine
@@ -808,7 +834,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
 			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
-			return;	
+			return;
 		}
 
 		//Free ptr
@@ -831,7 +857,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 		//Find the metadata before ptr
 		while(curr!=ptr) {
 			prev=curr;
-			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size); 
+			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size);
 		}
 
 		//If the metadata prev pointer is free, combine
@@ -854,7 +880,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
 			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
-			return;	
+			return;
 		}
 
 		//Free ptr
@@ -877,7 +903,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 		//Find the metadata before ptr
 		while(curr!=ptr) {
 			prev=curr;
-			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size); 
+			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size);
 		}
 
 		//If the metadata prev pointer is free, combine
