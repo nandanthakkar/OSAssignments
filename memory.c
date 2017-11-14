@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include "my_pthread_t.h"
 
 typedef struct _pageNode {
@@ -84,16 +87,16 @@ void fatalError(int line, char* file) {
 
 //function to swap pages from memory to file
 //swap function that swaps pages
-int swap(pageNode* inMem, pageNode* inSwap) {
-	node* inMem=NULL;
-	node* cursor=NULL;
+int swap(pageNode* inSwap) {
+	pageNode* inMem=NULL;
+	pageNode* cursor=NULL;
 
 	//index of the memory location used as a temp location to swap
 	int tempIndex=8000000 - (pageSize * 7);
 
 	//find node in swap
 	cursor=(pageNode*)rightBlockStart;
-	while(cursor < pageSpaceStart){
+	while((int*)cursor < (int*)pageSpaceStart){
 		if(cursor->offset == (inSwap->pageId-1) * pageSize + 1) {
 			inMem=cursor;
 		}
