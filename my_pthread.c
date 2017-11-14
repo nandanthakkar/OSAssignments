@@ -27,6 +27,8 @@ static ucontext_t schedulerContext;      //context for scheduler, this may not b
 static my_pthread_t currentThread=0;;
 static struct itimerval iValue;
 static time_t lastMaintenance=0;
+static tcb* nextThread=NULL;
+static char cursorEqualsFifoHead=0;
 
 
 //function decleration
@@ -116,12 +118,18 @@ void schedule(int x){
   while(1) {
     currentThread=cursor->thread;
     getcontext(&schedulerContext);
+    nextThread=cursor->next;
+    if(cursor==fifoHead) {
+      cursorEqualsFifoHead=1;
+    } else {
+      cursorEqualsFifoHead=0;
+    }
     setitimer(ITIMER_REAL, &iValue, NULL);
     swapcontext(&schedulerContext, &cursor->context);
     currentThread=schedulerThread;
     if(head != NULL) {
-      if(cursor->next != NULL && cursor!= fifoHead) {
-        cursor=cursor->next;
+      if(nextThread!= NULL && cursorEqualsFifoHead==0) {
+        cursor=nextThread;
       }
       else {
         cursor=head;
@@ -335,7 +343,8 @@ void threadComplete() {
   	}
   }
 
-  free((temp->context).uc_stack.ss_sp); 
+  free((temp->context).uc_stack.ss_sp);
+  free(temp);
   ucontext_t tempContext;
   getcontext(&tempContext);
   swapcontext(&tempContext,&schedulerContext);
@@ -434,8 +443,11 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     if(temp == NULL) {
       return ENOMEM;
     }
+    memset(temp,0,sizeof(tcb));
+    temp->next==NULL;
     if(head==NULL) {
       head=temp;
+      temp->next==NULL;
     } else {
       while(cursor->next!=NULL) {
         cursor=cursor->next;
@@ -473,6 +485,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
       cursor=cursor->next;
      }
     }
+
 
     //swap to scheduler
     swapcontext(&mainThread->context, &schedulerContext);
