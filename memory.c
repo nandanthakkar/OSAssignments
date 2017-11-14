@@ -113,9 +113,9 @@ int memAlignPages(int threadID){
 	
 	
 	//temp pageNode to find all pages of given thread
-	pageNode * pageNodeAddr = (_pageNode *)rightBlockStart;
+	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
-	while(pageNodeAddr < (char *)rightBlockStart + OSRightBlockSize){
+	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
 		// if found page of a thread then align it.
 		if(pageNodeAddr->threadId = threadID ){
 			
@@ -123,17 +123,17 @@ int memAlignPages(int threadID){
 			if(pageNodeAddr->offset > 0){
 				
 				//create temp page node to find if space where we want align if free or occupied
-				pageNode * pageTemp = (_pageNode *)rightBlockStart;
+				pageNode * pageTemp = (pageNode *)rightBlockStart;
 				
 				// created to find if space where we want to align  is occupied.
 				char isOccupied = 0;
 				
 				//find page node for space where we want to align
-				while(pageTemp < (char *)rightBlockStart + OSRightBlockSize){
+				while((char *)pageTemp < (char *)(rightBlockStart + OSRightBlockSize)){
 					
 					// if found a
 					if(pageTemp->offset == (((pageNodeAddr->pageId)-1) * pageSize)+1){
-						memcpy((void*)((char *)memory + bytesMemory - pageSize*7), (void*)((char *)pageSpaceStart + (pageTemp->offset) -1, pageSize);
+						memcpy((void*)((char *)memory + bytesMemory - pageSize*7), (void*)((char *)pageSpaceStart + (pageTemp->offset) -1), pageSize);
 						memcpy((void*)((char *)pageSpaceStart + pageTemp->offset -1), (void*)((char *)pageSpaceStart + pageNodeAddr->offset -1), pageSize);
 						memcpy((void*)((char *)pageSpaceStart + (pageNodeAddr->offset) - 1),(void*)((char *)memory + bytesMemory - pageSize*7), pageSize);
 						memset((void*)((char *)memory + bytesMemory - pageSize*7), 0, pageSize);
@@ -155,7 +155,7 @@ int memAlignPages(int threadID){
 			}
 			
 			if(pageNodeAddr->offset < 0){
-				int i = swap(pagNodeAddr);
+				int i = swap(pageNodeAddr);
 				if(i == 0){
 					perror("swap function did not work");
 					fatalError(__LINE__,__FILE__);
