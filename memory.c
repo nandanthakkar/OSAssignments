@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 #include "my_pthread_t.h"
 
 typedef struct _pageNode {
@@ -126,28 +127,32 @@ static void memoryhandler(int sig, siginfo_t *si, void *unused)
            printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
        }
 
-int memAlignPages(int threadID){
-
-
+int memAlignPages(){
+	
+	int threadID = getCurrentThread();
+	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
+	int maxPage = -1;	
 	//temp pageNode to find all pages of given thread
 	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
 	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
 		// if found page of a thread then align it.
 		if(pageNodeAddr->threadId = threadID && pageNodeAddr->offset != (pageSpaceStart + ((pageNodeAddr->pageId-1)*pageSize)+1)){
-
+			if(pageNodeAddr->pageId > maxPage){
+				maxPage = pageNodeAddr->pageId;
+			}
 			//if page node we  need to align is in memory
 			if(pageNodeAddr->offset > 0){
-
+				
 				//create temp page node to find if space where we want align if free or occupied
 				pageNode * pageTemp = (pageNode *)rightBlockStart;
-
+				
 				// created to find if space where we want to align  is occupied.
 				char isOccupied = 0;
-
+				
 				//find page node for space where we want to align
 				while((char *)pageTemp < (char *)(rightBlockStart + OSRightBlockSize)){
-
+					
 					// if found a
 					if(pageTemp->offset == (((pageNodeAddr->pageId)-1) * pageSize)+1){
 						memcpy((void*)((char *)memory + bytesMemory - pageSize*7), (void*)((char *)pageSpaceStart + (pageTemp->offset) -1), pageSize);
@@ -159,10 +164,10 @@ int memAlignPages(int threadID){
 						pageNodeAddr->offset = offsetTemp;
 						isOccupied = 1;
 					}
-
+					
 					pageTemp++;
 				}
-
+				
 				if(!isOccupied){
 					perror("did not find pageNode for location to swap to");
 					fatalError(__LINE__,__FILE__);
@@ -170,7 +175,7 @@ int memAlignPages(int threadID){
 					// pagNodeAddr->offset = (int)((pageNodeAddr->pageId - 1) * pageSize) + 1 ;
 				}
 			}
-
+			
 			if(pageNodeAddr->offset < 0){
 				int i = swap(pageNodeAddr);
 				if(i == 0){
@@ -181,9 +186,21 @@ int memAlignPages(int threadID){
 		}
 		pageNodeAddr++;
 	}
+	if(mprotect(memory,OSSize,PROT_NONE) == -1){
+		perror("mprotect did not work");
+		fatalError(__LINE__,__FILE__);
+	}
+	void * addr = pageSpaceStart + maxPage*pageSize;
+	size_t size = (size_t)(((char *)memory + bytesMemory - (pageSize * 3)) - (char *)addr);
+	if(size > 0){
+		int i =	mprotect(addr, size,PROT_NONE);
+		if(i == -1){
+			perror("mprotect did not work");
+			fatalError(__LINE__,__FILE__);
+		}
+	}
 	return 1;
 }
-
 void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr);
 
 //NOTE: argument 2 changed to char* from int -Steve 11-9-2017 9:23AM
