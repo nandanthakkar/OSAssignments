@@ -109,6 +109,11 @@ void fatalError(int line, char* file) {
 	exit(-1);
 }
 
+static void memoryhandler(int sig, siginfo_t *si, void *unused)
+       {
+           printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
+       }
+
 int memAlignPages(int threadID){
 	
 	
@@ -174,6 +179,16 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
+		struct sigaction sa;//put it in header file
+        	sa.sa_flags = SA_SIGINFO;
+        	sigemptyset(&sa.sa_mask);
+        	sa.sa_sigaction = memoryhandler;
+
+       	 	if (sigaction(SIGSEGV, &sa, NULL) == -1)
+       		{
+        	    printf("Fatal error setting up signal handler\n");
+        	    exit(EXIT_FAILURE);    //explode!
+	        }
 
 		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
