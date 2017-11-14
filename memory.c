@@ -45,7 +45,7 @@ static int freePagesBufferNumber=3;
 
 static int totalPagesInMemory=2048;
 
-static int totalPagesUser=1509;
+static int totalPagesUser=1505;
 
 static int alwaysFreePages=3;
 
@@ -85,8 +85,8 @@ int swap(pageNode* inMem, pageNode* inSwap) {
 	memcpy(memory + tempIndex, memory + inMem->offset - 1, pageSize);
 
 	//read from swap into to Memory
-	lseek(fd, (-1)*inSwap->offset, SEEK_CUR);
-	read(fd, memory + inMem->offset, pageSize);
+	lseek(fd, -1+(-1)*inSwap->offset, SEEK_CUR);
+	read(fd, memory + -1+inMem->offset, pageSize);
 	lseek(fd, SEEK_CUR - 1, 0);
 
 	//write temp into swap
@@ -96,7 +96,7 @@ int swap(pageNode* inMem, pageNode* inSwap) {
 	//update Offsets
 	//remember inMem is now in swap and inSwap is now in mem
 	inMem->offset=(-1)*inMem->offset;
-	inSwap->offset=(inSwap->pageId - 1) * (pageSize + 1);
+	inSwap->offset=(inSwap->pageId - 1) * (pageSize)+1;
   return 0;
 }
 
@@ -297,7 +297,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 				cursor->size=size;
 				cursor->inUse=1;
 
-				//Create a new memode for remaining free space
+				//Create a new memNode for remaining free space
 				memNode* newMemNodePtr=(memNode*)((char*)cursor+sizeof(memNode)+size);
 				newMemNodePtr->size=originalSize-size-sizeof(memNode);
 				newMemNodePtr->inUse=0;
@@ -390,8 +390,10 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 					//If the pageNode refers to a page not in memory than bring it into memory and initialize the page
 					if(currentPageNode->offset<0) {
-						//bring page form swap file to memory
-						//initialize page
+						swap(currentPageNode);
+						memNode* startOfPage=(memNode*)(pageSpaceStart+currentPageNode->offset-1);
+						startOfPage->inUse=0;
+						startOfPage->size=freshPageFreeSize;
 					}
 
 					//allocate the memory
@@ -481,7 +483,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 				//If the page is not in memory bring it into memory
 				if(firstPageNode->offset<0) {
-					//swap into memory
+					swap(pgNode);
 				}
 
 				//Start of the page in memory
@@ -501,7 +503,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 					pgNode->pageId=i+1;
 
 					if(pgNode->offset<0) {
-						//swap into memory
+						swap(pgNode);
 					}
 				}
 
@@ -566,7 +568,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 				//If the page is not in memory bring it into memory
 				if(firstPageNode->offset<0) {
-					//swap into memory
+					swap(firstPageNode);
 				}
 
 				//Start of the page in memory
@@ -585,7 +587,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 					pgNode->largestFreeMemory=-1;
 					pgNode->pageId=highestPageId->pageId+1;
 					if(pgNode->offset<0) {
-						//swap into memory
+						swap(pgNode);
 					}
 				}
 
@@ -628,7 +630,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 				cursor->size=size;
 				cursor->inUse=1;
 
-				//Create new memode for the remaining free space
+				//Create new memNode for the remaining free space
 				memNode* newMemNodePtr=(memNode*)((char*)cursor+sizeof(memNode)+size);
 				newMemNodePtr->size=originalSize-size-sizeof(memNode);
 				newMemNodePtr->inUse=0;
@@ -712,7 +714,7 @@ void* shalloc(size_t size) {
 				cursor->size=size;
 				cursor->inUse=1;
 
-				//Create a new memode for remaining free space
+				//Create a new memNode for remaining free space
 				memNode* newMemNodePtr=(memNode*)((char*)cursor+sizeof(memNode)+size);
 				newMemNodePtr->size=originalSize-size-sizeof(memNode);
 				newMemNodePtr->inUse=0;
@@ -734,6 +736,155 @@ void* shalloc(size_t size) {
 
 		//If no space available return NULL
 		return NULL;	
+}
+
+void mydeallocate(void* address, char* FILE, int LINE) {
+	if(address == NULL) {
+		printf("Error freeing memory in %s, line %d: Cannot free null pointer\n", file, line);
+		return;
+	}
+
+	//freeing of address before array
+	if(address<memory){
+		printf("Error freeing memory in %s, line %d: Address outside of memory block\n", file, line);
+		return;
+	}
+
+	//freeing of ptr in OS Left Block
+	else if(address<rightBlockStart) {
+
+		//Creates a pointer of type memNode
+		memNode* ptr = (memNode*)(address - sizeof(memNode));
+
+		//Checks if the pointer is already freed
+		if(ptr->inUse == 0) {
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
+			return;	
+		}
+
+		//Free ptr
+		ptr->state=0;
+
+		//Get the metadata after ptr
+		memNode* next= (memNode*)((char*)ptr+sizeof(memNode) + ptr->size);
+
+		if(next<(memNode*)OSRightBlockSize&&next->inUse==0) {
+			ptr->size=ptr->size + sizeof(memNode) + next->size;
+		}
+
+		memNode* curr=(memNode*) memory;
+		memNode* prev=NULL;
+
+		if(curr==ptr) {
+			return;
+		}
+
+		//Find the metadata before ptr
+		while(curr!=ptr) {
+			prev=curr;
+			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size); 
+		}
+
+		//If the metadata prev pointer is free, combine
+		if(prev->inUse==0) {
+			prev->size=prev->size+sizeof(memNode)+ptr->size;
+		}
+
+	}
+
+	//freeing of PageNode
+	else if (address<pageSpaceStart) {
+		printf("Error freeing memory in %s, line %d: Dont free pageNodes\n", file, line);
+		return;
+	}
+
+	//freeing of address inside page space region
+	else if (address<pageSpaceStart+pageSize*totalPagesUser) {
+
+		//Creates a pointer of type memNode
+		memNode* ptr = (memNode*)(address - sizeof(memNode));
+
+		//Checks if the pointer is already freed
+		if(ptr->inUse == 0) {
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
+			return;	
+		}
+
+		//Free ptr
+		ptr->state=0;
+
+		//Get the metadata after ptr
+		memNode* next= (memNode*)((char*)ptr+sizeof(memNode) + ptr->size);
+
+		if(next<(memNode*)(pageSpaceStart+pageSize*totalPagesUser)&&next->inUse==0) {
+			ptr->size=ptr->size + sizeof(memNode) + next->size;
+		}
+
+		memNode* curr=(memNode*) pageSpaceStart;
+		memNode* prev=NULL;
+
+		if(curr==ptr) {
+			return;
+		}
+
+		//Find the metadata before ptr
+		while(curr!=ptr) {
+			prev=curr;
+			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size); 
+		}
+
+		//If the metadata prev pointer is free, combine
+		if(prev->inUse==0) {
+			prev->size=prev->size+sizeof(memNode)+ptr->size;
+		}
+	}
+
+	else if(address<pageSpaceStart+pageSize*totalPagesUser+pageSize*alwaysFreePages) {
+		printf("Error freeing memory in %s, line %d: Dont free in always free pages\n", file, line);
+		return;
+	}
+
+	//freeing inside shared region
+	else if(address<memory+pageSize*totalPagesInMemory) {
+
+		//Creates a pointer of type memNode
+		memNode* ptr = (memNode*)(address - sizeof(memNode));
+
+		//Checks if the pointer is already freed
+		if(ptr->inUse == 0) {
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
+			return;	
+		}
+
+		//Free ptr
+		ptr->state=0;
+
+		//Get the metadata after ptr
+		memNode* next= (memNode*)((char*)ptr+sizeof(memNode) + ptr->size);
+
+		if(next<(memNode*)(memory+pageSize*totalPagesInMemory)&&next->inUse==0) {
+			ptr->size=ptr->size + sizeof(memNode) + next->size;
+		}
+
+		memNode* curr=(memNode*)(pageSpaceStart+pageSize*totalPagesUser+pageSize*alwaysFreePages);
+		memNode* prev=NULL;
+
+		if(curr==ptr) {
+			return;
+		}
+
+		//Find the metadata before ptr
+		while(curr!=ptr) {
+			prev=curr;
+			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size); 
+		}
+
+		//If the metadata prev pointer is free, combine
+		if(prev->inUse==0) {
+			prev->size=prev->size+sizeof(memNode)+ptr->size;
+		}
+	}
+
 }
 
 
