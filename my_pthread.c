@@ -16,7 +16,7 @@
 #include <time.h>
 #include <errno.h>
 #include <unistd.h>
-#define SIZE 5000
+#define SIZE 32000
 #define TIME 25000
 
 //globals
@@ -406,6 +406,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     getcontext(&schedulerContext);
     schedulerContext.uc_link=NULL;
     schedulerContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
+    printf("scheduler context loc: %lu\n", schedulerContext.uc_stack.ss_sp);
     if(schedulerContext.uc_stack.ss_sp == NULL) {
       return ENOMEM;
     }
@@ -419,6 +420,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     getcontext(&mainContext);
     mainContext.uc_link=&schedulerContext;
     mainContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
+    printf("main stack loc: %lu\n",mainContext.uc_stack.ss_sp);
     if(mainContext.uc_stack.ss_sp == NULL) {
       return ENOMEM;
     }
@@ -486,7 +488,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     tcb* mainThread=NULL;
     while(cursor!=NULL) {
       printf("Loop pthread 2\n");
-      if(cursor->thread==0) {
+      if(cursor->thread==1) {
         mainThread=cursor;
         break;
       }
@@ -500,7 +502,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
       cursor=fifoHead;
       while(cursor!=NULL) {
         printf("Loop pthread 3\n");
-        if(cursor->thread==currentThread) {
+        if(cursor->thread==1) {
           mainThread=cursor;
           break;
         }
@@ -509,6 +511,13 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
      }
     }
 
+    if(mainThread==NULL) {
+      printf("main thread is null\n");
+    }
+
+    printf("main thread loc: %lu\n",mainThread);
+
+    printf("mainThread: %d\n",mainThread->thread  );
     printf("right before swap to scheduler\n");
     //swap to scheduler
     swapcontext(&mainThread->context, &schedulerContext);
@@ -595,6 +604,8 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
   //check if thread exists
   cursor=head;
   while(cursor != NULL) {
+    printf("Cursor thread: %d\n",cursor->thread);
+    printf("thread: %d\n",thread);
     if(cursor->thread==thread) {
       found=1;
     }

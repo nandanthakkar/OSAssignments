@@ -160,6 +160,7 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
 	int x=-1;
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
+		printf("First time malloc\n");
 		//open file
 		fd=open("swapFile.txt", O_RDWR | O_CREAT, 0666);
 		if(fd == -1) {
@@ -177,7 +178,7 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
 			fatalError(__LINE__, __FILE__);
 		}
 
-		struct sigaction sa;//put it in header file
+		/*struct sigaction sa;//put it in header file
         	sa.sa_flags = SA_SIGINFO;
         	sigemptyset(&sa.sa_mask);
         	sa.sa_sigaction = memoryhandler;
@@ -186,7 +187,7 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
        		{
         	    printf("Fatal error setting up signal handler\n");
         	    exit(EXIT_FAILURE);    //explode!
-	        }
+	        }*/
 
 		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
@@ -766,7 +767,7 @@ void* shalloc(size_t size) {
 }
 
 void mydeallocate(void* address, char* file1, int line1, int thread) {
-	printf("Start my deallocate\n");
+	printf("Start my deallocate on : %lu\n",address);
 	if(address == NULL) {
 		printf("Error freeing memory in %s, line %d: Cannot free null pointer\n", file1, line1);
 		return;
@@ -783,6 +784,10 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 
 		//Creates a pointer of type memNode
 		memNode* ptr = (memNode*)(address - sizeof(memNode));
+
+		printf("Size: %d\n", ptr->size);
+
+		printf("Size plus ptr: %lu\n",ptr->size+address );
 
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
