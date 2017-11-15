@@ -103,6 +103,8 @@ int swap(pageNode* inSwap) {
 		}
 	}
 
+	mprotect(pageSpaceStart+inMem->offset-1,pageSize,PROT_READ | PROT_WRITE);
+
 	//copy memory page into temp memory page
 	memcpy(memory + tempIndex, memory + inMem->offset - 1, pageSize);
 
@@ -130,7 +132,7 @@ static void memoryhandler(int sig, siginfo_t *si, void *unused)
 int memAlignPages(){
 	
 	int threadID = getCurrentThread();
-	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
+	mprotect(pageSpaceStart,pagesize*totalPagesUser,PROT_READ | PROT_WRITE);
 	int maxPage = -1;	
 	//temp pageNode to find all pages of given thread
 	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
@@ -530,7 +532,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 
 				//If the page is not in memory bring it into memory
 				if(firstPageNode->offset<0) {
-					swap(pgNode);
+					swap(firstPageNode);
 				}
 
 				//Start of the page in memory
@@ -787,13 +789,13 @@ void* shalloc(size_t size) {
 
 void mydeallocate(void* address, char* FILE, int LINE) {
 	if(address == NULL) {
-		printf("Error freeing memory in %s, line %d: Cannot free null pointer\n", file, line);
+		printf("Error freeing memory in %s, line %d: Cannot free null pointer\n", FILE, LINE);
 		return;
 	}
 
 	//freeing of address before array
 	if(address<memory){
-		printf("Error freeing memory in %s, line %d: Address outside of memory block\n", file, line);
+		printf("Error freeing memory in %s, line %d: Address outside of memory block\n", FILE, LINE);
 		return;
 	}
 
@@ -805,17 +807,17 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
-			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", FILE, LINE);
 			return;
 		}
 
 		//Free ptr
-		ptr->state=0;
+		ptr->inUse=0;
 
 		//Get the metadata after ptr
 		memNode* next= (memNode*)((char*)ptr+sizeof(memNode) + ptr->size);
 
-		if(next<(memNode*)OSRightBlockSize&&next->inUse==0) {
+		if(next<(memNode*)rightBlockStart&&next->inUse==0) {
 			ptr->size=ptr->size + sizeof(memNode) + next->size;
 		}
 
@@ -841,7 +843,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 	//freeing of PageNode
 	else if (address<pageSpaceStart) {
-		printf("Error freeing memory in %s, line %d: Dont free pageNodes\n", file, line);
+		printf("Error freeing memory in %s, line %d: Dont free pageNodes\n", FILE, LINE);
 		return;
 	}
 
@@ -853,12 +855,12 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
-			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", FILE, LINE);
 			return;
 		}
 
 		//Free ptr
-		ptr->state=0;
+		ptr->inUse=0;
 
 		//Get the metadata after ptr
 		memNode* next= (memNode*)((char*)ptr+sizeof(memNode) + ptr->size);
@@ -887,7 +889,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 	}
 
 	else if(address<pageSpaceStart+pageSize*totalPagesUser+pageSize*alwaysFreePages) {
-		printf("Error freeing memory in %s, line %d: Dont free in always free pages\n", file, line);
+		printf("Error freeing memory in %s, line %d: Dont free in always free pages\n", FILE, LINE);
 		return;
 	}
 
@@ -899,12 +901,12 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
-			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file, line);
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", FILE, LINE);
 			return;
 		}
 
 		//Free ptr
-		ptr->state=0;
+		ptr->inUse=0;
 
 		//Get the metadata after ptr
 		memNode* next= (memNode*)((char*)ptr+sizeof(memNode) + ptr->size);
