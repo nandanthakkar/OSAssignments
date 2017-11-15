@@ -125,21 +125,24 @@ int swap(pageNode* inSwap) {
 }
 
 static void memoryhandler(int sig, siginfo_t *si, void *unused)
-       {
-           printf("Got SIGSEGV at address: 0x%lx\n",(long) si->si_addr);
-       }
+{
+           if(pageSpaceStart<=si->si_addr&&si_addr<pageSpaceStart+pageSize*totalPagesUser) {
+           	memAlignPages();
+           }
+           
+}
 
 int memAlignPages(){
 	
 	int threadID = getCurrentThread();
-	mprotect(pageSpaceStart,pagesize*totalPagesUser,PROT_READ | PROT_WRITE);
+	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
 	int maxPage = -1;	
 	//temp pageNode to find all pages of given thread
 	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
 	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
 		// if found page of a thread then align it.
-		if(pageNodeAddr->threadId = threadID && pageNodeAddr->offset != (pageSpaceStart + ((pageNodeAddr->pageId-1)*pageSize)+1)){
+		if(pageNodeAddr->threadId = threadID && pageNodeAddr->offset != (-1*pageSpaceStart + ((pageNodeAddr->pageId-1)*pageSize)+1)){
 			if(pageNodeAddr->pageId > maxPage){
 				maxPage = pageNodeAddr->pageId;
 			}
@@ -193,7 +196,7 @@ int memAlignPages(){
 		fatalError(__LINE__,__FILE__);
 	}
 	void * addr = pageSpaceStart + maxPage*pageSize;
-	size_t size = (size_t)(((char *)memory + bytesMemory - (pageSize * 3)) - (char *)addr);
+	size_t size = (size_t)(((char *)memory + bytesMemory - (pageSize * 4)) - (char *)addr);
 	if(size > 0){
 		int i =	mprotect(addr, size,PROT_NONE);
 		if(i == -1){
