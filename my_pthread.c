@@ -20,7 +20,7 @@
 #define TIME 25000
 
 //globals
-static int i=0;
+static int i=1;
 static tcb* head=NULL;                   //head of the tcb
 static tcb* waitQueueHead=NULL;
 static tcb* fifoHead=NULL;
