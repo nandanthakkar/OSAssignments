@@ -7,6 +7,7 @@
 // iLab Server:
 
 #include "my_pthread_t.h"
+#include "memory.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
@@ -24,7 +25,7 @@ static tcb* head=NULL;                   //head of the tcb
 static tcb* waitQueueHead=NULL;
 static tcb* fifoHead=NULL;
 static ucontext_t schedulerContext;      //context for scheduler, this may not be necessary
-static my_pthread_t currentThread=0;;
+static my_pthread_t currentThread=0;
 static struct itimerval iValue;
 static time_t lastMaintenance=0;
 static tcb* nextThread=NULL;
@@ -34,7 +35,7 @@ static char cursorEqualsFifoHead=0;
 //function decleration
 void schedule(int x);
 
-void maintenance() ;
+void maintenance();
 
 
 int getCurrentThread() {
@@ -117,6 +118,7 @@ void schedule(int x){
   cursor=cursor->next;
   while(1) {
     currentThread=cursor->thread;
+    memAlignPages();
     getcontext(&schedulerContext);
     nextThread=cursor->next;
     if(cursor==fifoHead) {
@@ -366,7 +368,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
   //build new context
   getcontext(&newContext);
   newContext.uc_link=&completeContext;
-  newContext.uc_stack.ss_sp=malloc(SIZE);
+  newContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
   if(newContext.uc_stack.ss_sp == NULL) {
     return ENOMEM;
   }
@@ -378,7 +380,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
   //build context for thread return
   getcontext(&completeContext);
   completeContext.uc_link=&schedulerContext;
-  completeContext.uc_stack.ss_sp=malloc(SIZE);
+  completeContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
   if(completeContext.uc_stack.ss_sp == NULL) {
     return ENOMEM;
   }
@@ -393,7 +395,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     //build context for scheduler
     getcontext(&schedulerContext);
     schedulerContext.uc_link=NULL;
-    schedulerContext.uc_stack.ss_sp=malloc(SIZE);
+    schedulerContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
     if(schedulerContext.uc_stack.ss_sp == NULL) {
       return ENOMEM;
     }
@@ -404,18 +406,18 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     //build context for main
     getcontext(&mainContext);
     mainContext.uc_link=&schedulerContext;
-    mainContext.uc_stack.ss_sp=malloc(SIZE);
+    mainContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
     if(mainContext.uc_stack.ss_sp == NULL) {
       return ENOMEM;
     }
     mainContext.uc_stack.ss_size=SIZE;
 
     //allocate space for main
-    head=(tcb*)malloc(sizeof(tcb));
+    head=(tcb*)myallocate(sizeof(tcb),__FILE__,__LINE__,0);
     if(head==NULL) {
       return ENOMEM;
     }
-    head->next=(tcb*)malloc(sizeof(tcb));
+    head->next=(tcb*)myallocate(sizeof(tcb),__FILE__,__LINE__,0);
     if(head->next == NULL) {
       return ENOMEM;
     }
@@ -439,7 +441,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
   else {
     //add new thread right after main thread in linked list
     cursor=head;
-    temp=(tcb*)malloc(sizeof(tcb));
+    temp=(tcb*)myallocate(sizeof(tcb),__FILE__,__LINE__,0);
     if(temp == NULL) {
       return ENOMEM;
     }
@@ -727,4 +729,3 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex) {
   
   return 0;
 };
-

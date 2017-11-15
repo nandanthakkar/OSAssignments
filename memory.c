@@ -6,77 +6,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include "my_pthread_t.h"
+#include "memory.h"
 
-typedef struct _pageNode {
-	//Size of largest free memory segment in the page. If -1, used for a request that spanned multiple pages
-	//Can't use for any other requests. If other negative number, no page in use
-	int largestFreeMemory;
-	int threadId;
-	int pageId;
-	//Negative means in swap file. Positive means in memory. Offsets start at 1 not 0
-	int offset;
-} pageNode;
-
-typedef struct _memNode {
-	char inUse;
-	int size;
-} memNode;
-
-static char firstTimeMalloc=1;
-
-static void* memory;
-//NOTE:made this void* to get rid of warnings, can be changed back if needed - Steve 11-9-2017, 9:10AM
-
-//file descriptor
-static int fd;
-
-//4096 bytes
-static int pageSize;
-
-//stack size of each thead;
-static int stackSize=64000;
-
-//968 bytes
-static int tcbSize=(sizeof(tcb));
-
-static int threadLimit=32;
-
-static int leftBlockPageNumber=512;
-
-static int rightBlockPageNumber=24;
-
-static int sharedRegionPageNumber=4;
-
-static int freePagesBufferNumber=3;
-
-static int totalPagesInMemory=2048;
-
-static int totalPagesUser=1505;
-
-static int alwaysFreePages=3;
-
-static int totalPagesMemoryAndSwapFile=6144;
-
-static int totalBytes=25165824;
-
-static int bytesMemory=8388608;
-
-
-//Size of segment for mallocs from pthread library
-static int OSLeftBlockSize;
-
-//Size of segment for pageNodes
-static int OSRightBlockSize;
-
-//Size of segment of memory dedicated to pageNodes and mallocs from the phtread library
-static int OSSize;
-
-//Size of free memory when a new page is allocated
-static int freshPageFreeSize;
-
-static void* rightBlockStart;
-
-static void* pageSpaceStart;
 
 //error function to print message and exit
 void fatalError(int line, char* file) {
@@ -103,7 +34,7 @@ int swap(pageNode* inSwap) {
 		}
 	}
 
-	mprotect(pageSpaceStart+inMem->offset-1,pageSize,PROT_READ | PROT_WRITE);
+	//mprotect(pageSpaceStart+inMem->offset-1,pageSize,PROT_READ | PROT_WRITE);
 
 	//copy memory page into temp memory page
 	memcpy(memory + tempIndex, memory + inMem->offset - 1, pageSize);
@@ -126,7 +57,7 @@ int swap(pageNode* inSwap) {
 
 static void memoryhandler(int sig, siginfo_t *si, void *unused)
 {
-           if(pageSpaceStart<=si->si_addr&&si_addr<pageSpaceStart+pageSize*totalPagesUser) {
+           if(pageSpaceStart<=si->si_addr&&si->si_addr<pageSpaceStart+pageSize*totalPagesUser) {
            	memAlignPages();
            }
            
@@ -135,14 +66,14 @@ static void memoryhandler(int sig, siginfo_t *si, void *unused)
 int memAlignPages(){
 	
 	int threadID = getCurrentThread();
-	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
+	//mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
 	int maxPage = -1;	
 	//temp pageNode to find all pages of given thread
 	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
 	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
 		// if found page of a thread then align it.
-		if(pageNodeAddr->threadId = threadID && pageNodeAddr->offset != (-1*pageSpaceStart + ((pageNodeAddr->pageId-1)*pageSize)+1)){
+		if(pageNodeAddr->threadId = threadID && pageNodeAddr->offset != (((pageNodeAddr->pageId-1)*pageSize)+1)){
 			if(pageNodeAddr->pageId > maxPage){
 				maxPage = pageNodeAddr->pageId;
 			}
@@ -191,25 +122,25 @@ int memAlignPages(){
 		}
 		pageNodeAddr++;
 	}
-	if(mprotect(memory,OSSize,PROT_NONE) == -1){
+	/*if(mprotect(memory,OSSize,PROT_NONE) == -1){
 		perror("mprotect did not work");
 		fatalError(__LINE__,__FILE__);
-	}
+	}*/
 	void * addr = pageSpaceStart + maxPage*pageSize;
 	size_t size = (size_t)(((char *)memory + bytesMemory - (pageSize * 4)) - (char *)addr);
-	if(size > 0){
+	/*if(size > 0){
 		int i =	mprotect(addr, size,PROT_NONE);
 		if(i == -1){
 			perror("mprotect did not work");
 			fatalError(__LINE__,__FILE__);
 		}
-	}
+	}*/
 	return 1;
 }
 void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr);
 
 //NOTE: argument 2 changed to char* from int -Steve 11-9-2017 9:23AM
-void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
+void * myallocate(size_t size, char* file1, int line1, int thread) {
 	int x=-1;
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
@@ -325,7 +256,7 @@ void * myallocate(size_t size, char* FILE, int LINE, int THREADREQ) {
 	}
 
 	//Library called malloc
-	if(THREADREQ==0) {
+	if(thread==0) {
 
 		//The start of the os left block
 		memNode* cursor=(memNode*)memory;
@@ -790,15 +721,15 @@ void* shalloc(size_t size) {
 		return NULL;
 }
 
-void mydeallocate(void* address, char* FILE, int LINE) {
+void mydeallocate(void* address, char* file1, int line1, int thread) {
 	if(address == NULL) {
-		printf("Error freeing memory in %s, line %d: Cannot free null pointer\n", FILE, LINE);
+		printf("Error freeing memory in %s, line %d: Cannot free null pointer\n", file1, line1);
 		return;
 	}
 
 	//freeing of address before array
 	if(address<memory){
-		printf("Error freeing memory in %s, line %d: Address outside of memory block\n", FILE, LINE);
+		printf("Error freeing memory in %s, line %d: Address outside of memory block\n", file1, line1);
 		return;
 	}
 
@@ -810,7 +741,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
-			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", FILE, LINE);
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file1, line1);
 			return;
 		}
 
@@ -846,7 +777,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 	//freeing of PageNode
 	else if (address<pageSpaceStart) {
-		printf("Error freeing memory in %s, line %d: Dont free pageNodes\n", FILE, LINE);
+		printf("Error freeing memory in %s, line %d: Dont free pageNodes\n", file1, line1);
 		return;
 	}
 
@@ -858,7 +789,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
-			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", FILE, LINE);
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file1, line1);
 			return;
 		}
 
@@ -892,7 +823,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 	}
 
 	else if(address<pageSpaceStart+pageSize*totalPagesUser+pageSize*alwaysFreePages) {
-		printf("Error freeing memory in %s, line %d: Dont free in always free pages\n", FILE, LINE);
+		printf("Error freeing memory in %s, line %d: Dont free in always free pages\n", file1, line1);
 		return;
 	}
 
@@ -904,7 +835,7 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
-			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", FILE, LINE);
+			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file1, line1);
 			return;
 		}
 
@@ -936,13 +867,5 @@ void mydeallocate(void* address, char* FILE, int LINE) {
 			prev->size=prev->size+sizeof(memNode)+ptr->size;
 		}
 	}
-
-}
-
-
-void main() {
-	int j=7;
-
-	myallocate(10, __FILE__, __LINE__, 0);
 
 }
