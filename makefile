@@ -6,15 +6,15 @@ RANLIB = ranlib
 
 Target: my_pthread.a
 
-my_pthread.a: my_pthread.o
-	$(AR) libmy_pthread.a my_pthread.o
+my_pthread.a: my_pthread.o memory.o
+	$(AR) libmy_pthread.a my_pthread.o memory.o
 	$(RANLIB) libmy_pthread.a
 
 my_pthread.o: my_pthread_t.h memory.h
-	$(CC) -pthread $(CFLAGS) my_pthread.c memory.c
+	$(CC)  $(CFLAGS) my_pthread.c
 
-#memory.o: memory.h
-	#$(CC) -memory $(CFLAGS) memory.c
+memory.o: memory.h
+	$(CC)  $(CFLAGS) memory.c
 
 
 clean:

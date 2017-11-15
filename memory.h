@@ -1,6 +1,16 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include "my_pthread_t.h"
+#include "memory.h"
+
 #define _GNU_SOURCE
 
 #define THREADREQ 1

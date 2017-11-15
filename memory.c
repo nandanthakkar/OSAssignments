@@ -5,9 +5,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include "my_pthread_t.h"
 #include "memory.h"
 
+int getCurrentThread();
 
 //error function to print message and exit
 void fatalError(int line, char* file) {
