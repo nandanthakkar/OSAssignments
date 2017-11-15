@@ -93,7 +93,7 @@ int swap(pageNode* inSwap) {
 	pageNode* cursor=NULL;
 
 	//index of the memory location used as a temp location to swap
-	int tempIndex=8000000 - (pageSize * 7);
+	int tempIndex=bytesMemory - (pageSize * 7);
 
 	//find node in swap
 	cursor=(pageNode*)rightBlockStart;
