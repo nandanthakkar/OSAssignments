@@ -25,7 +25,7 @@ static tcb* head=NULL;                   //head of the tcb
 static tcb* waitQueueHead=NULL;
 static tcb* fifoHead=NULL;
 static ucontext_t schedulerContext;      //context for scheduler, this may not be necessary
-static my_pthread_t currentThread=0;
+static my_pthread_t currentThread=1;
 static struct itimerval iValue;
 static time_t lastMaintenance=0;
 static tcb* nextThread=NULL;
