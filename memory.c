@@ -898,6 +898,35 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 		if(prev->inUse==0) {
 			prev->size=prev->size+sizeof(memNode)+ptr->size;
 		}
+
+
+		//update the pageNode
+
+		int offsetShouldBe=(unsigned long)address - (unsigned long) address%pageSize + 1;
+
+		int largestFreeMemory=0;
+
+		pageNode* currentPageNode=(pageNode*)rightBlockStart;
+
+		while(currentPageNode<(pageNode*)(rightBlockStart+OSRightBlockSize-7*sizeof(pageNode))) {
+			if(currentPageNode->offset==offsetShouldBe) {
+				memNode* mNode=(memNode*)(pageSpaceStart+currentPageNode->offset-1);
+				while(mNode<(memNode*)(pageSpaceStart + currentPageNode->offset -1 + pageSize)) {
+					if(mNode->inUse==0 && mNode->size>largestFreeMemory) {
+						largestFreeMemory=mNode->size;
+					}
+
+					mNode=(memNode*)((char*)mNode+sizeof(memNode)+mNode->size);
+				}
+
+				currentPageNode->largestFreeMemory=largestFreeMemory;
+				break;
+			}
+
+			currentPageNode+=1;
+		}
+
+
 	}
 
 	else if(address<pageSpaceStart+pageSize*totalPagesUser+pageSize*alwaysFreePages) {
