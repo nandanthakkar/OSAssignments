@@ -950,3 +950,25 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 	printf("Return from my deallocate\n");
 
 }
+
+/*	Function to clean out pages of thread that is completing. Should be called in thread complete
+*/
+void cleanOutPageNodes(int threadId) {
+	pageNode* currentPageNode=(pageNode*)rightBlockStart;
+	while(currentPageNode<(pageNode*)(rightBlockStart+OSRightBlockSize-7*sizeof(pageNode))) {
+		if(currentPageNode->threadId==threadId) {
+			if(currentPageNode->offset<0) {
+				swap(currentPageNode);
+			}
+			memNode* firstMemNode=(memNode*)(pageSpaceStart+currentPageNode->offset-1);
+			firstMemNode->inUse=0;
+			firstMemNode->size=freshPageFreeSize;
+
+			currentPageNode->largestFreeMemory=freshPageFreeSize;
+			currentPageNode->threadId=0;
+			currentPageNode->pageId=0;
+		}
+
+		currentPageNode+=1;
+	}
+}

@@ -92,6 +92,8 @@ static void* pageSpaceStart;
 
 int memAlignPages();
 
+void cleanOutPageNodes(int threadId);
+
 void * myallocate(size_t size, char* file1, int line1 , int thread);
 
 void mydeallocate(void* address, char* file1, int line1, int thread);

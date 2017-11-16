@@ -349,6 +349,8 @@ void threadComplete() {
       }
   	}
   }
+  printf("about to clean ot pages\n");
+  cleanOutPageNodes(prevThread);
   printf("about to free\n");
   free((temp->context).uc_stack.ss_sp);
   free(temp);
