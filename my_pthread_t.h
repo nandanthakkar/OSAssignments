@@ -12,6 +12,7 @@
 
 /* To use real pthread Library in Benchmark, you have to comment the USE_MY_PTHREAD macro */
 #define USE_MY_PTHREAD 1
+#define THREADREQ 1
 
 
 /* include lib header files that you need here: */
@@ -21,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ucontext.h>
+#include <memory.h>
 typedef uint my_pthread_t;
 
 typedef struct threadControlBlock {
@@ -43,6 +45,8 @@ typedef struct my_pthread_mutex_t {
 
 
 /* Function Declarations: */
+
+void* myallocate(size_t size, char* file1, int line1, int thread);;
 
 int getCurrentThread();
 
@@ -80,6 +84,8 @@ int my_pthread_mutex_destroy(my_pthread_mutex_t *mutex);
 #define pthread_mutex_lock my_pthread_mutex_lock
 #define pthread_mutex_unlock my_pthread_mutex_unlock
 #define pthread_mutex_destroy my_pthread_mutex_destroy
+#define malloc(x) myallocate(x, __FILE__, __LINE__, THREADREQ)
+#define free(x) mydeallocate(x, __FILE__, __LINE__, THREADREQ)
 #endif
 
 #endif

@@ -155,7 +155,7 @@ int memAlignPages(){
 void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr);
 
 //NOTE: argument 2 changed to char* from int -Steve 11-9-2017 9:23AM
-void * myallocate(size_t size, char* file1, int line1, int thread) {
+void* myallocate(size_t size, char* file1, int line1, int thread) {
 	printf("Start my allocate\n");
 	int x=-1;
 	//first time malloc is called, need to initalize mmory array
@@ -359,10 +359,10 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
 
 						void* output=allocateMemoryInPage(size,currentPageNode);
 
-						printf("output %lu\n",output);
+						printf("output %p\n",(void*)output);
 
 						//allocate the memory
-						return output;
+						return (void*)output;
 					}
 
 					//In swap file and there is space avaible
@@ -683,7 +683,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 				pageNodePtr->largestFreeMemory=largestFreeMemory;
 
 
-				printf("my allocate return: %lu\n",(cursor+1));
+				printf("my allocate return: %u\n",(cursor+1));
 
 				//return the address of the allocation
 				return (void*)(cursor+1);
