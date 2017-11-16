@@ -355,17 +355,23 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
 
 					//In memory and there is space available in the page
 					if(currentPageNode->offset>0&&currentPageNode->largestFreeMemory>=size) {
+						printf("TEST\n");
+
+						void* output=allocateMemoryInPage(size,currentPageNode);
+
+						printf("output %lu\n",output);
 
 						//allocate the memory
-						return pageSpaceStart+(currentPageNode->pageId-1)*pageSize+(long)(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+						return output;
 					}
 
 					//In swap file and there is space avaible
 					else if (currentPageNode->offset<0&&currentPageNode->largestFreeMemory>=size) {
+						printf("TEST2\n");
 						//bring page from swap file into memory
 
 						//allocte the memory
-						return pageSpaceStart+(currentPageNode->pageId-1)*pageSize+(long)(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+						return allocateMemoryInPage(size,currentPageNode);
 					}
 
 					//Page count needs to be incremented
@@ -407,8 +413,9 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
 						startOfPage->size=freshPageFreeSize;
 					}
 
+					printf("TEST3\n");
 					//allocate the memory
-					return pageSpaceStart+(currentPageNode->pageId-1)*pageSize+(long)(allocateMemoryInPage(size,currentPageNode)-currentPageNode->offset);
+					return pageSpaceStart+pageSize*(currentPageNode->pageId-1)+(allocateMemoryInPage(size,currentPageNode) - (pageSpaceStart + currentPageNode->offset -1 ));
 				}
 
 			}
@@ -606,7 +613,7 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
 					}
 				}
 
-				return pageSpaceStart+(pageSize-1)*firstPageNode->pageId+sizeof(memNode);
+				return pageSpaceStart+(pageSize)*firstPageNode->pageId-1+sizeof(memNode);
 
 			}
 
@@ -622,13 +629,15 @@ void * myallocate(size_t size, char* file1, int line1, int thread) {
 */
 void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 
-	printf("start allocateMemoryInPage\n");
+	printf("start allocateMemoryInPage: %lu\n",pageNodePtr);
 
 	//location of beginning of page
-	memNode* cursor=(memNode*)pageSpaceStart+pageNodePtr->offset;
+	memNode* cursor=(memNode*)((char*)pageSpaceStart+pageNodePtr->offset-1);
 
 	//location of end of page
 	void* endOfPage=(void*)cursor+pageSize;
+
+	printf("edn of pahe: %lu\n",endOfPage);
 
 
 	while(cursor<(memNode*)endOfPage) {
@@ -656,22 +665,25 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 				newMemNodePtr->inUse=0;
 
 				//Jump back to start of page
-				memNode* ptr=(memNode*)pageSpaceStart+pageNodePtr->offset;
+				memNode* ptr=(memNode*)((char*)pageSpaceStart+pageNodePtr->offset-1);
 
 				//loop through page and find the largest free region and update the pageNode
 				int largestFreeMemory=0;
 				while(ptr<(memNode*)endOfPage) {
-					printf("Loop13\n");
+					printf("Loop13\n");	
 					if(ptr->inUse==0) {
 						if(ptr->size>largestFreeMemory) {
 							largestFreeMemory=ptr->size;
 						}
 					}
-
+	
 					ptr=(memNode*)((char*)ptr+sizeof(memNode)+ptr->size);
 				}
 
 				pageNodePtr->largestFreeMemory=largestFreeMemory;
+
+
+				printf("my allocate return: %lu\n",(cursor+1));
 
 				//return the address of the allocation
 				return (void*)(cursor+1);
@@ -685,7 +697,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 				cursor->size=size;
 
 				//Jump back to start of page
-				memNode* ptr=(memNode*)pageSpaceStart+pageNodePtr->offset;
+				memNode* ptr=(memNode*)((char*)pageSpaceStart+pageNodePtr->offset-1);
 
 				//loop through page and find the largest free region and update the pageNode
 				int largestFreeMemory=0;
@@ -709,7 +721,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 			cursor=(memNode*)((char*)cursor+sizeof(memNode)+cursor->size);
 		}
 
-		printf("Return from allocateMemoryInPage\n");
+		printf("Return from allocateMemoryInPage null\n");
 
 		//Return null if no room in page. This should never happen
 		return NULL;
