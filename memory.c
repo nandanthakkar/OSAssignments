@@ -316,6 +316,11 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 			pageNodeCreatedCounter++;
 		}
 
+		memNode* firstSharedPage=(memNode*)(pageSpaceStart+(totalPagesUser + alwaysFreePages)*pageSize);
+
+		firstSharedPage->inUse=0;
+		firstSharedPage->size=(pageSize*4-sizeof(memNode));
+
 		printf("Swap nodes created\n");
 
 	}
@@ -822,12 +827,137 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 
 void* shalloc(size_t size) {
 
+		printf("shalloc started\n");
+
+
+		if(firstTimeMalloc==1) {
+			int x=-1;
+			printf("First time malloc\n");
+			//open file
+			fd=open("swapFile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+			if(fd == -1) {
+				fatalError(__LINE__, __FILE__);
+			}
+
+			//lseek to make file 100 bytes and then set back to beinging
+			x=lseek(fd, totalBytes - bytesMemory-1, SEEK_CUR);
+			if(x != totalBytes - bytesMemory-1){
+				fatalError(__LINE__, __FILE__);
+			}
+
+			x=lseek(fd, SEEK_CUR - 1, 0);
+			if(x != 0) {
+				fatalError(__LINE__, __FILE__);
+			}
+	        	/*sa.sa_flags = SA_SIGINFO;
+	        	sigemptyset(&sa.sa_mask);
+	        	sa.sa_sigaction = memoryhandler;
+
+	       	 	if (sigaction(SIGSEGV, &sa, NULL) == -1)
+	       		{
+	        	    printf("Fatal error setting up signal handler\n");
+	        	    exit(EXIT_FAILURE);    //explode!
+		        }*/
+
+			//Macro to get the page size
+			pageSize=sysconf(_SC_PAGE_SIZE);
+
+			x=posix_memalign(&memory,pageSize,bytesMemory);
+			if(x != 0) {
+				fatalError(__LINE__, __FILE__);
+			}
+
+
+			OSLeftBlockSize=leftBlockPageNumber*pageSize;
+			OSRightBlockSize=rightBlockPageNumber*pageSize;
+			OSSize=OSLeftBlockSize+OSRightBlockSize;
+			freshPageFreeSize=pageSize-sizeof(memNode);
+			rightBlockStart=memory+leftBlockPageNumber*pageSize;
+			pageSpaceStart=rightBlockStart+rightBlockPageNumber*pageSize;
+
+
+			//Make sure this if statement never fires again
+			firstTimeMalloc=0;
+
+			//Create a node to manage the free space in the left block
+			memNode OSNode1={0,leftBlockPageNumber*pageSize-sizeof(memNode)};
+
+			//Copy that node into the memory array
+			*((memNode*)memory)=OSNode1;
+
+			//Lef block shold be set up now
+			//Left block contains memory allocated by the my_pthread library
+			//Right block contains pageNodes
+
+			//*****************************************************************
+
+			pageNode* currentPageNode=(pageNode*)rightBlockStart;
+
+
+			//Set up right block
+			pageNode mainPageNode= {freshPageFreeSize,1,1,1};
+			*currentPageNode=mainPageNode;
+
+			pageNode* pageNodeAddr=currentPageNode;
+			//initialize actual page with a memNode
+			memNode* currentPage=(memNode*)pageSpaceStart;
+			memNode firstPageMemNode={0,freshPageFreeSize};
+			*currentPage=firstPageMemNode;
+
+
+			int pageNodeCreatedCounter=1;
+
+			//adress of the current page node to be created
+			currentPageNode+=1;
+
+
+			currentPage=(memNode*)((char*)currentPage+pageSize);
+
+
+			//loop through the pageNodes for pages in memory and initalize the pageNodes as well as their pages
+			while(pageNodeCreatedCounter<totalPagesUser) {
+				pageNode newPageNode={-2,0,0,1+pageSize*pageNodeCreatedCounter};
+				*currentPageNode=newPageNode;
+
+				memNode newMemNode={0,freshPageFreeSize};
+				*currentPage=newMemNode;
+
+
+				currentPage=(memNode*)((char*)currentPage+pageSize);
+				currentPageNode+=1;
+				pageNodeCreatedCounter++;
+
+			}
+
+			printf("memory nodes created\n");
+
+			int numNodesInMemory=pageNodeCreatedCounter;
+
+			//Initialize the pageNodes of pages not in memory
+			while(pageNodeCreatedCounter<totalPagesMemoryAndSwapFile) {
+				pageNode newPageNode={-2,0,0,-1 - (pageNodeCreatedCounter-numNodesInMemory)*pageSize};
+				*currentPageNode=newPageNode;
+
+				currentPageNode+=1;
+				pageNodeCreatedCounter++;
+			}
+
+			memNode* firstSharedPage=(memNode*)(pageSpaceStart+(totalPagesUser + alwaysFreePages)*pageSize);
+
+			firstSharedPage->inUse=0;
+			firstSharedPage->size=(pageSize*4-sizeof(memNode));
+
+			printf("Swap nodes created\n");
+		}
+
 
 		//The start of the shared space
 		memNode* cursor=(memNode*)(memory+(totalPagesInMemory-4)*pageSize);
 
-		//Loop through the entire left block
-		while(cursor<(memNode*)(memory+totalPagesInMemory*pageSize)) {
+		printf("addrss of cursor shalloc: %lu\n",cursor);
+
+		//Loop through the entire shared block
+		while(cursor<(memNode*)(memory+totalBytes)) {
 			printf("Loop15\n");
 
 			//If the block is being used skip

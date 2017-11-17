@@ -46,7 +46,9 @@ typedef struct my_pthread_mutex_t {
 
 /* Function Declarations: */
 
-void* myallocate(size_t size, char* file1, int line1, int thread);;
+void* myallocate(size_t size, char* file1, int line1, int thread);
+
+void* shalloc(size_t size);
 
 int getCurrentThread();
 
