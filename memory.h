@@ -87,6 +87,8 @@ static void* rightBlockStart;
 
 static void* pageSpaceStart;
 
+static struct sigaction sa;
+
 
 
 
