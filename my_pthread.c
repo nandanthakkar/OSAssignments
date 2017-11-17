@@ -30,6 +30,7 @@ static struct itimerval iValue;
 static time_t lastMaintenance=0;
 static tcb* nextThread=NULL;
 static char cursorEqualsFifoHead=0;
+static char inComplete=0;
 
 
 //function decleration
@@ -48,7 +49,7 @@ int getCurrentThread() {
 void signalhandeler(int x) {
   printf("signalhandeler\n");
   
-  if(currentThread == -8) {
+  if(inComplete == 1||getInMemoryCFile()==1) {
 	  return;
   }
 
@@ -259,9 +260,10 @@ void maintenance() {
 /*****************************************************************************************/
 //removes a thread from TCB
 void threadComplete() {
+  inComplete=1;
   int prevThread=currentThread;
   printf("Thread complete called on: %d\n", prevThread);
-  currentThread=-8;
+ // currentThread=-8;
 
   tcb* cursor;
   tcb* temp;
@@ -356,6 +358,7 @@ void threadComplete() {
   free(temp);
   ucontext_t tempContext;
   getcontext(&tempContext);
+  inComplete=0;
   swapcontext(&tempContext,&schedulerContext);
 }
 

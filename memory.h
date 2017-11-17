@@ -31,6 +31,8 @@ typedef struct _memNode {
 	int size;
 } memNode;
 
+static char inMemoryCFile=0;
+
 static char firstTimeMalloc=1;
 
 static void* memory;
@@ -91,7 +93,7 @@ static struct sigaction sa;
 
 
 
-
+char getInMemoryCFile();
 int memAlignPages();
 
 void cleanOutPageNodes(int threadId);
