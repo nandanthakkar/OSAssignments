@@ -468,7 +468,7 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 
 					//Set its thread, pageId, and largestFreeMemory
 					currentPageNode->threadId=getCurrentThread();
-					currentPageNode->pageId=pageCount;
+					currentPageNode->pageId=pageCount+1;
 					currentPageNode->largestFreeMemory=freshPageFreeSize;
 
 					//If the pageNode refers to a page not in memory than bring it into memory and initialize the page
