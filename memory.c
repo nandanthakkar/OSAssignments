@@ -21,7 +21,6 @@ void fatalError(int line, char* file) {
 //swap function that swaps pages
 int swap(pageNode* inSwap) {
 	printf("Start swap\n");
-	mprotect(pageSpaceStart+inMem->offset-1,pageSize,PROT_READ | PROT_WRITE);
 	pageNode* inMem=NULL;
 	pageNode* cursor=NULL;
 
@@ -161,14 +160,14 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr);
 void* myallocate(size_t size, char* file1, int line1, int thread) {
 
 	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
-	
+
 	printf("Start my allocate\n");
 	int x=-1;
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
 		printf("First time malloc\n");
 		//open file
-		fd=open("swapFile.txt", O_RDWR | O_CREAT, 0666);
+		fd=open("swapFile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
 		if(fd == -1) {
 			fatalError(__LINE__, __FILE__);
 		}
