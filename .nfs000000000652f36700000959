@@ -18,7 +18,7 @@ void fatalError(int line, char* file) {
 }
 
 int protectMemory(){
-  	printf("start protectMemory\n");
+  printf("start protectMemory\n");
 	int threadID = getCurrentThread();
 
 	printf("thread id current %d\n", threadID );
@@ -28,13 +28,13 @@ int protectMemory(){
 	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
 	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
-    		if(pageNodeAddr->offset > 0 && pageNodeAddr->threadId){
-      			if(maxPage < pageNodeAddr->pageId){
-        			maxPage = pageNodeAddr->pageId;
-      			}
-    		}	
-    		pageNodeAddr= pageNodeAddr +1;
-  	}
+    if(pageNodeAddr->offset > 0 && pageNodeAddr->threadId){
+      if(maxPage < pageNodeAddr->pageId){
+        maxPage = pageNodeAddr->pageId;
+      }
+    }
+    pageNodeAddr= pageNodeAddr +1;
+  }
  	if(mprotect(memory,OSSize,PROT_NONE) == -1){
 		perror("mprotect did not work");
 		fatalError(__LINE__,__FILE__);
@@ -50,7 +50,7 @@ int protectMemory(){
 			fatalError(__LINE__,__FILE__);
 		}
 	}
-	printf("Return from protectMemory\n");
+	printf("Return from memalign\n");
 }
 
 //function to swap pages from memory to file

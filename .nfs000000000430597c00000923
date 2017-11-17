@@ -17,42 +17,6 @@ void fatalError(int line, char* file) {
 	exit(-1);
 }
 
-int protectMemory(){
-  	printf("start protectMemory\n");
-	int threadID = getCurrentThread();
-
-	printf("thread id current %d\n", threadID );
-	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
-	int maxPage = -1;	
-	//temp pageNode to find all pages of given thread
-	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
-	//loop to scroll through all page nodes
-	while((char *)pageNodeAddr < (char *)(rightBlockStart + OSRightBlockSize)){
-    		if(pageNodeAddr->offset > 0 && pageNodeAddr->threadId){
-      			if(maxPage < pageNodeAddr->pageId){
-        			maxPage = pageNodeAddr->pageId;
-      			}
-    		}	
-    		pageNodeAddr= pageNodeAddr +1;
-  	}
- 	if(mprotect(memory,OSSize,PROT_NONE) == -1){
-		perror("mprotect did not work");
-		fatalError(__LINE__,__FILE__);
-	}
-	void * addr = pageSpaceStart + maxPage*pageSize;
-	size_t size = (size_t)(((char *)memory + bytesMemory - (pageSize * 4)) - (char *)addr);
-
-	printf("addr: %lu, sizeof size_t,size: %ld\n",addr,sizeof(size_t),size);
-	if(size > 0){
-		int i =	mprotect(addr, size,PROT_NONE);
-		if(i == -1){
-			perror("mprotect did not work");
-			fatalError(__LINE__,__FILE__);
-		}
-	}
-	printf("Return from protectMemory\n");
-}
-
 //function to swap pages from memory to file
 //swap function that swaps pages
 int swap(pageNode* inSwap) {
@@ -74,6 +38,8 @@ int swap(pageNode* inSwap) {
 
 		cursor=cursor+1;
 	}
+
+	//mprotect(pageSpaceStart+inMem->offset-1,pageSize,PROT_READ | PROT_WRITE);
 
 	//copy memory page into temp memory page
 	memcpy(memory + tempIndex, memory + inMem->offset - 1, pageSize);
@@ -101,7 +67,7 @@ static void memoryhandler(int sig, siginfo_t *si, void *unused)
            /*if(pageSpaceStart<=si->si_addr&&si->si_addr<pageSpaceStart+pageSize*totalPagesUser) {
            	memAlignPages();
            }*/
-           
+
 }
 
 int memAlignPages(){
@@ -109,8 +75,8 @@ int memAlignPages(){
 	int threadID = getCurrentThread();
 
 	printf("thread id current %d\n", threadID );
-	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
-	int maxPage = -1;	
+	//mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
+	int maxPage = -1;
 	//temp pageNode to find all pages of given thread
 	pageNode * pageNodeAddr = (pageNode *)rightBlockStart;
 	//loop to scroll through all page nodes
@@ -124,17 +90,17 @@ int memAlignPages(){
 			}
 			//if page node we  need to align is in memory
 			if(pageNodeAddr->offset > 0){
-				
+
 				//create temp page node to find if space where we want align if free or occupied
 				pageNode * pageTemp = (pageNode *)rightBlockStart;
-				
+
 				// created to find if space where we want to align  is occupied.
 				char isOccupied = 0;
-				
+
 				//find page node for space where we want to align
 				while((char *)pageTemp < (char *)(rightBlockStart + OSRightBlockSize)){
 					//printf("Loop3\n");
-					
+
 					// if found a
 					if(pageTemp->offset == (((pageNodeAddr->pageId)-1) * pageSize)+1){
 						memcpy((void*)((char *)memory + bytesMemory - pageSize*7), (void*)((char *)pageSpaceStart + (pageTemp->offset) -1), pageSize);
@@ -146,10 +112,10 @@ int memAlignPages(){
 						pageNodeAddr->offset = offsetTemp;
 						isOccupied = 1;
 					}
-					
+
 					pageTemp++;
 				}
-				
+
 				if(!isOccupied){
 					printf("Current thread: %d",getCurrentThread());
 					printf("ThreadId: %d, pageId: %d, offset: %d", pageNodeAddr->threadId, pageNodeAddr->pageId, pageNodeAddr->offset);
@@ -159,7 +125,7 @@ int memAlignPages(){
 					// pagNodeAddr->offset = (int)((pageNodeAddr->pageId - 1) * pageSize) + 1 ;
 				}
 			}
-			
+
 			if(pageNodeAddr->offset < 0){
 				int i = swap(pageNodeAddr);
 				if(i == 0){
@@ -172,21 +138,19 @@ int memAlignPages(){
 		pageNodeAddr=pageNodeAddr+1;
 
 	}
-	if(mprotect(memory,OSSize,PROT_NONE) == -1){
+	/*if(mprotect(memory,OSSize,PROT_NONE) == -1){
 		perror("mprotect did not work");
 		fatalError(__LINE__,__FILE__);
-	}
+	}*/
 	void * addr = pageSpaceStart + maxPage*pageSize;
 	size_t size = (size_t)(((char *)memory + bytesMemory - (pageSize * 4)) - (char *)addr);
-
-	printf("addr: %lu, size: %d\n",addr,size);
-	if(size > 0){
+	/*if(size > 0){
 		int i =	mprotect(addr, size,PROT_NONE);
 		if(i == -1){
 			perror("mprotect did not work");
 			fatalError(__LINE__,__FILE__);
 		}
-	}
+	}*/
 	printf("Return from memalign\n");
 	return 1;
 }
@@ -194,9 +158,6 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr);
 
 //NOTE: argument 2 changed to char* from int -Steve 11-9-2017 9:23AM
 void* myallocate(size_t size, char* file1, int line1, int thread) {
-
-	mprotect(memory,bytesMemory,PROT_READ | PROT_WRITE);
-
 	printf("Start my allocate\n");
 	int x=-1;
 	//first time malloc is called, need to initalize mmory array
@@ -218,6 +179,8 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 		if(x != 0) {
 			fatalError(__LINE__, __FILE__);
 		}
+
+		/*struct sigaction sa;//put it in header file
         	sa.sa_flags = SA_SIGINFO;
         	sigemptyset(&sa.sa_mask);
         	sa.sa_sigaction = memoryhandler;
@@ -226,7 +189,7 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
        		{
         	    printf("Fatal error setting up signal handler\n");
         	    exit(EXIT_FAILURE);    //explode!
-	        }
+	        }*/
 
 		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
@@ -388,7 +351,7 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 
 			//Loop through all pageNodes
 			while(pageCounter<totalPagesMemoryAndSwapFile - alwaysFreePages - sharedRegionPageNumber) {
-				//printf("Loop7\n");
+				printf("Loop7\n");
 
 				//If you find a pageNode with correspoding threadId
 				if(currentPageNode->threadId==getCurrentThread()) {
@@ -427,7 +390,6 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 			}
 
 			if(pageCount>=totalPagesUser) {
-				printf("returning null pagecount>=totalPagesUser\n");
 				return NULL;
 			}
 
@@ -437,7 +399,7 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 
 			//Loop through all pageNodes
 			while(pageCounter<totalPagesMemoryAndSwapFile - sharedRegionPageNumber - alwaysFreePages) {
-				//printf("Loop8\n");
+				printf("Loop8\n");
 
 				//pageNode is free
 				if(currentPageNode->threadId==0) {
@@ -459,15 +421,11 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 
 					memAlignPages();
 					//allocate the memory
-					return allocateMemoryInPage(size, currentPageNode);
+					return pageSpaceStart+pageSize*(currentPageNode->pageId-1)+(allocateMemoryInPage(size,currentPageNode) - (pageSpaceStart + currentPageNode->offset -1 ));
 				}
-
-				pageCounter++;
-				currentPageNode+=1;
 
 			}
 
-			printf("returning null all pages used\n");
 			//If all pageNodes used, no more memory to allocate
 			return NULL;
 		}
@@ -726,13 +684,13 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 				//loop through page and find the largest free region and update the pageNode
 				int largestFreeMemory=0;
 				while(ptr<(memNode*)endOfPage) {
-					printf("Loop13\n");	
+					printf("Loop13\n");
 					if(ptr->inUse==0) {
 						if(ptr->size>largestFreeMemory) {
 							largestFreeMemory=ptr->size;
 						}
 					}
-	
+
 					ptr=(memNode*)((char*)ptr+sizeof(memNode)+ptr->size);
 				}
 
@@ -906,13 +864,6 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 		//Creates a pointer of type memNode
 		memNode* ptr = (memNode*)(address - sizeof(memNode));
 
-		memNode* pageStart=(memNode*)((unsigned long)address-(unsigned long)address%pageSize);
-
-		memNode* pageEnd=(memNode*)((char*)pageStart+pageSize);
-
-
-		printf("ptr: %lu, pagestart %lu, pageEnd %lu\n",ptr,pageStart,pageEnd );
-
 		//Checks if the pointer is already freed
 		if(ptr->inUse == 0) {
 			printf("Error freeing memory in %s, line %d: Pointer has no memory allocated\n", file1, line1);
@@ -925,11 +876,11 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 		//Get the metadata after ptr
 		memNode* next= (memNode*)((char*)ptr+sizeof(memNode) + ptr->size);
 
-		if(next<pageEnd&&next->inUse==0) {
+		if(next<(memNode*)(pageSpaceStart+pageSize*totalPagesUser)&&next->inUse==0) {
 			ptr->size=ptr->size + sizeof(memNode) + next->size;
 		}
 
-		memNode* curr=pageStart;
+		memNode* curr=(memNode*) pageSpaceStart;
 		memNode* prev=NULL;
 
 		if(curr==ptr) {
@@ -938,7 +889,7 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 
 		//Find the metadata before ptr
 		while(curr!=ptr) {
-			printf("Loop17: %lu\n curr->size: %lu\n",curr,curr->size);
+			printf("Loop17\n");
 			prev=curr;
 			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size);
 		}
@@ -947,35 +898,6 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 		if(prev->inUse==0) {
 			prev->size=prev->size+sizeof(memNode)+ptr->size;
 		}
-
-
-		//update the pageNode
-
-		int offsetShouldBe=(unsigned long)address - (unsigned long) address%pageSize + 1;
-
-		int largestFreeMemory=0;
-
-		pageNode* currentPageNode=(pageNode*)rightBlockStart;
-
-		while(currentPageNode<(pageNode*)(rightBlockStart+OSRightBlockSize-7*sizeof(pageNode))) {
-			if(currentPageNode->offset==offsetShouldBe) {
-				memNode* mNode=(memNode*)(pageSpaceStart+currentPageNode->offset-1);
-				while(mNode<(memNode*)(pageSpaceStart + currentPageNode->offset -1 + pageSize)) {
-					if(mNode->inUse==0 && mNode->size>largestFreeMemory) {
-						largestFreeMemory=mNode->size;
-					}
-
-					mNode=(memNode*)((char*)mNode+sizeof(memNode)+mNode->size);
-				}
-
-				currentPageNode->largestFreeMemory=largestFreeMemory;
-				break;
-			}
-
-			currentPageNode+=1;
-		}
-
-
 	}
 
 	else if(address<pageSpaceStart+pageSize*totalPagesUser+pageSize*alwaysFreePages) {
@@ -1027,26 +949,4 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 
 	printf("Return from my deallocate\n");
 
-}
-
-/*	Function to clean out pages of thread that is completing. Should be called in thread complete
-*/
-void cleanOutPageNodes(int threadId) {
-	pageNode* currentPageNode=(pageNode*)rightBlockStart;
-	while(currentPageNode<(pageNode*)(rightBlockStart+OSRightBlockSize-7*sizeof(pageNode))) {
-		if(currentPageNode->threadId==threadId) {
-			if(currentPageNode->offset<0) {
-				swap(currentPageNode);
-			}
-			memNode* firstMemNode=(memNode*)(pageSpaceStart+currentPageNode->offset-1);
-			firstMemNode->inUse=0;
-			firstMemNode->size=freshPageFreeSize;
-
-			currentPageNode->largestFreeMemory=freshPageFreeSize;
-			currentPageNode->threadId=0;
-			currentPageNode->pageId=0;
-		}
-
-		currentPageNode+=1;
-	}
 }
