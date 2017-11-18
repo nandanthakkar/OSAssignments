@@ -80,20 +80,21 @@ int swap(pageNode* inSwap) {
 	}
 
 	//copy memory page into temp memory page
-	memcpy(memory + tempIndex, memory + inMem->offset - 1, pageSize);
+	memcpy(memory + tempIndex, pageSpaceStart + inMem->offset - 1, pageSize);
 
 	//read from swap into to Memory
-	lseek(fd, -1+(-1)*inSwap->offset, SEEK_CUR);
-	read(fd, memory + inMem->offset, pageSize);
-	lseek(fd, SEEK_CUR - 1, 0);
+	lseek(fd, -1+(-1)*inSwap->offset, SEEK_SET);//changed to SEEK_SET to access data from offset + 0. NT
+	read(fd, pageSpaceStart + inMem->offset -1, pageSize);//Added -1 to offset: NT
+	//lseek(fd, SEEK_CUR - 1, 0);  Not sure if that is needed. NT
 
 	//write temp into swap
 	write(fd, memory + tempIndex, pageSize);
-	lseek(fd, SEEK_CUR - 1, 0);
+	//lseek(fd, SEEK_CUR - 1, 0); Not sure if this line needed. NT
 
 	//update Offsets
 	//remember inMem is now in swap and inSwap is now in mem
-	inMem->offset=(-1)*inMem->offset;
+	//int tempOffset = inMem->offset; // added temp to save offset
+	inMem->offset=inSwap->offset; // put inSwap offset inside inMem offset. NT
 	inSwap->offset=(inSwap->pageId - 1) * (pageSize) + 1;
 
 	printf("Return from swap\n");
