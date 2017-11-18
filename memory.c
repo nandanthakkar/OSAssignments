@@ -811,7 +811,7 @@ void* allocateMemoryInPage(size_t size, pageNode* pageNodePtr) {
 
 				//Update the memNode
 				cursor->inUse=1;
-				cursor->size=size;
+				cursor->size=originalSize;
 
 				//Jump back to start of page
 				memNode* ptr=(memNode*)((char*)pageSpaceStart+pageNodePtr->offset-1);
@@ -1144,6 +1144,9 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 
 		//Find the metadata before ptr
 		while(curr!=ptr) {
+			if(curr==NULL) {
+				printf("curr null\n");
+			}
 			printf("Loop17: %lu\n curr->size: %lu\n",curr,curr->size);
 			prev=curr;
 			curr=(memNode*)((char*)curr + sizeof(memNode) + curr->size);
