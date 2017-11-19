@@ -287,6 +287,7 @@ void threadComplete() {
   			temp2->next=addToRRHead;
   			addToRRHead=temp2;
   		}
+      break;
   	}
   	prev=cursor;
   	cursor=cursor->next;

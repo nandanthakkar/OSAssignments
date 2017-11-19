@@ -12,7 +12,7 @@ pthread_t *thread;
 int thread_num=32;
 
 //thread worker function
-int function() {
+int function(int num) {
         //my_pthread_join(1, NULL);
 
   printf("i am a function\n");
@@ -36,9 +36,10 @@ int function() {
   }
   for(i =0; i < 100;i++){
         if(i != *x[i]){
+              printf("Error exiting\n");
                 exit(-3);
         }
-  printf("freeing: %ld\n",x[i]);
+         printf("freeing: %ld\n",x[i]);
         free(x[i]);
 
         if(x[i] == NULL) {
@@ -46,7 +47,7 @@ int function() {
         }
   }
 
-  my_pthread_join(1, NULL);
+  printf("Exiting thread: %d\n", num);
 
 }
 
@@ -56,10 +57,14 @@ int main(int argc, char const *argv[]) {
   //initialize thread_num// initialize pthread_t
         thread = (pthread_t*)malloc(thread_num*sizeof(pthread_t));
 
-  for (i = 0; i < 9; ++i){
+  for (i = 0; i < 12; ++i){
                 printf("creating thread %d\n", i);
-                pthread_create(&thread[i], NULL, &function, NULL);
-                printf("exiting thread %d\n", i);
+                pthread_create(&thread[i], NULL, &function, i);
+  }
+  printf("Before joins\n");
+  int j=0;
+  for(j=2;j<14;j++) {
+    my_pthread_join(j, NULL);
   }
   return 0;
 }
