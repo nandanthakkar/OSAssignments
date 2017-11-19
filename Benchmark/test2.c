@@ -14,16 +14,16 @@ int thread_num=32;
 int function() {
   printf("i am a function\n");
 	int i = 0;
-	int * x[1000];
-  for(i =0; i < 1000;i++){
-  	x[i] = malloc(sizeof(int));
+	int * x[3000];
+  for(i =0; i < 3000;i++){
+  	x[i] = malloc(50*sizeof(long));
 
   	if(x[i] == NULL) {
     		printf("x is null\n");
   	}	
 	printf("mallocing %d",i);
   }
-   for(i =0; i < 1000; i++){
+   for(i =0; i < 3000; i++){
         //int* x = malloc(sizeof(int));
         *x[i] = i;
 	printf("printing: %d", *x[i]);
@@ -31,8 +31,11 @@ int function() {
                 printf("x is null\n");
         }*/
   }
-  for(i =0; i < 1000;i++){
-        free(x[i]);
+  for(i =0; i < 3000;i++){
+        if(i != *x[i]){
+		exit(-3);	
+	}
+	free(x[i]);
 
         /*if(x[i] == NULL) {
                 printf("x is null\n");
