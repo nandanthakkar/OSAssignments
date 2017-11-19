@@ -61,7 +61,7 @@ int protectMemory(){
 //swap function that swaps pages
 int swap(pageNode* inSwap) {
 	int fd=open("swapFile.txt", O_RDWR);
-	printf("Start swap\n");
+	//printf("Start swap\n");
 	pageNode* inMem=NULL;
 	pageNode* cursor=NULL;
 
@@ -85,11 +85,20 @@ int swap(pageNode* inSwap) {
 
 	//read from swap into to Memory
 	lseek(fd, -1+(-1)*inSwap->offset, SEEK_SET);//changed to SEEK_SET to access data from offset + 0. NT
-	read(fd, pageSpaceStart + inMem->offset -1, pageSize);//Added -1 to offset: NT
+	int readAmount=read(fd, pageSpaceStart + inMem->offset -1, pageSize);//Added -1 to offset: NT
+	while(readAmount<pageSize) {
+		//printf("in loop: %d\n", readAmount);
+		readAmount+=read(fd, pageSpaceStart + inMem->offset -1+readAmount, pageSize-readAmount);
+	}
+	lseek(fd,-1*pageSize,SEEK_CUR);
 	//lseek(fd, SEEK_CUR - 1, 0);  Not sure if that is needed. NT
 
 	//write temp into swap
-	write(fd, memory + tempIndex, pageSize);
+	int writeAmount=write(fd, memory + tempIndex, pageSize);
+
+	while(writeAmount<pageSize) {
+		writeAmount+=write(fd, memory + tempIndex + writeAmount, pageSize-writeAmount);
+	}
 	//lseek(fd, SEEK_CUR - 1, 0); Not sure if this line needed. NT
 
 	//update Offsets
@@ -97,24 +106,13 @@ int swap(pageNode* inSwap) {
 	//int tempOffset = inMem->offset; // added temp to save offset
 	inMem->offset=inSwap->offset; // put inSwap offset inside inMem offset. NT
 	inSwap->offset=(inSwap->pageId - 1) * (pageSize) + 1;
-
 	close(fd);
-	printf("Return from swap\n");
+	//printf("Return from swap\n");
   return 1;
 }
 
-static void memoryhandler(int sig, siginfo_t *si, void *unused)
-{
-           /*if(pageSpaceStart<=si->si_addr&&si->si_addr<pageSpaceStart+pageSize*totalPagesUser) {
-           	memAlignPages();
-           }*/
-
-	printf("memory handler\n");
-           
-}
-
 int memAlignPages(){
-	printf("start memalign\n");
+	//printf("start memalign\n");
 	int threadID = getCurrentThread();
 
 	//printf("thread id current %d\n", threadID );
@@ -214,9 +212,9 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 	int x=-1;
 	//first time malloc is called, need to initalize mmory array
 	if(firstTimeMalloc==1) {
-		printf("First time malloc\n");
+		//printf("First time malloc\n");
 		//open file
-		int fd=open("swapFile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+		/*int fd=open("swapFile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
 		if(fd == -1) {
 			fatalError(__LINE__, __FILE__);
 		}
@@ -227,23 +225,17 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 			fatalError(__LINE__, __FILE__);
 		}
 
-		x=lseek(fd, SEEK_CUR - 1, 0);
-		if(x != 0) {
-			fatalError(__LINE__, __FILE__);
-		}
-        	/*sa.sa_flags = SA_SIGINFO;
-        	sigemptyset(&sa.sa_mask);
-        	sa.sa_sigaction = memoryhandler;
+		x=lseek(fd,0,SEEK_SET);
+		*/
 
-       	 	if (sigaction(SIGSEGV, &sa, NULL) == -1)
-       		{
-        	    printf("Fatal error setting up signal handler\n");
-        	    exit(EXIT_FAILURE);    //explode!
-	        }*/
-			//Macro to get the page size
+		FILE* fp=fopen("swapFile.txt","w");
+		ftruncate(fileno(fp),totalBytes-bytesMemory);
+
+		fclose(fp);
+
+		//Macro to get the page size
 		pageSize=sysconf(_SC_PAGE_SIZE);
 
-		close(fd);
 
 		int x=posix_memalign(&memory,pageSize,bytesMemory);
 		if(x != 0) {
@@ -858,7 +850,7 @@ void* shalloc(size_t size) {
 			int x=-1;
 			//printf("First time malloc\n");
 			//open file
-			int fd=open("swapFile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+			/*int fd=open("swapFile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
 			if(fd == -1) {
 				fatalError(__LINE__, __FILE__);
 			}
@@ -872,7 +864,7 @@ void* shalloc(size_t size) {
 			x=lseek(fd, SEEK_CUR - 1, 0);
 			if(x != 0) {
 				fatalError(__LINE__, __FILE__);
-			}
+			}*/
 	        	/*sa.sa_flags = SA_SIGINFO;
 	        	sigemptyset(&sa.sa_mask);
 	        	sa.sa_sigaction = memoryhandler;
@@ -883,10 +875,14 @@ void* shalloc(size_t size) {
 	        	    exit(EXIT_FAILURE);    //explode!
 		        }*/
 
+			FILE* fp=fopen("swapFile.txt","w");
+			ftruncate(fileno(fp),totalBytes-bytesMemory);
+			fclose(fp);
+
 			//Macro to get the page size
 			pageSize=sysconf(_SC_PAGE_SIZE);
 
-			close(fd);
+			//close(fd);
 
 			x=posix_memalign(&memory,pageSize,bytesMemory);
 			if(x != 0) {

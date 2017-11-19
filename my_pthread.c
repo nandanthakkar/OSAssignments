@@ -47,7 +47,7 @@ int getCurrentThread() {
 /******************************************************************************/
 //signal handeler function to handle the signal
 void signalhandeler(int x) {
-  printf("signalhandeler\n");
+  //printf("signalhandeler\n");
   
   if(inComplete == 1||getInMemoryCFile()==1) {
 	  return;
@@ -121,7 +121,7 @@ void schedule(int x){
   while(1) {
     currentThread=cursor->thread;
     memAlignPages();
-    printf("back to scheduler from memAlignPages\n");
+    //printf("back to scheduler from memAlignPages\n");
     getcontext(&schedulerContext);
     nextThread=cursor->next;
     if(cursor==fifoHead) {
@@ -130,9 +130,9 @@ void schedule(int x){
       cursorEqualsFifoHead=0;
     }
     setitimer(ITIMER_REAL, &iValue, NULL);
-    printf("Before Swap to : %d\n",cursor->thread);
+    //printf("Before Swap to : %d\n",cursor->thread);
     swapcontext(&schedulerContext, &cursor->context);
-    printf("back to scheduler\n");
+   // printf("back to scheduler\n");
     currentThread=schedulerThread;
     if(head != NULL) {
       if(nextThread!= NULL && cursorEqualsFifoHead==0) {
@@ -262,7 +262,7 @@ void maintenance() {
 void threadComplete() {
   inComplete=1;
   int prevThread=currentThread;
-  printf("Thread complete called on: %d\n", prevThread);
+ // printf("Thread complete called on: %d\n", prevThread);
  // currentThread=-8;
 
   tcb* cursor;
@@ -351,9 +351,9 @@ void threadComplete() {
       }
   	}
   }
-  printf("about to clean ot pages\n");
+  //printf("about to clean ot pages\n");
   cleanOutPageNodes(prevThread);
-  printf("about to free\n");
+ // printf("about to free\n");
   free((temp->context).uc_stack.ss_sp);
   free(temp);
   ucontext_t tempContext;
@@ -374,7 +374,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
   ucontext_t completeContext;       //context for thread to go when it completes
   my_pthread_t* main;
 
-  printf("CREATE CALLED\n");
+  //printf("CREATE CALLED\n");
 
 
   //build new context
@@ -384,7 +384,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
   if(newContext.uc_stack.ss_sp == NULL) {
     return ENOMEM;
   }
-  printf("new context stack allocated\n");
+  //printf("new context stack allocated\n");
 
 
   newContext.uc_stack.ss_size=SIZE;
@@ -398,7 +398,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     return ENOMEM;
   }
 
-  printf("complete stack allocated\n");
+ // printf("complete stack allocated\n");
 
 
 
@@ -411,14 +411,14 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     getcontext(&schedulerContext);
     schedulerContext.uc_link=NULL;
     schedulerContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
-    printf("scheduler context loc: %lu\n", schedulerContext.uc_stack.ss_sp);
+    //printf("scheduler context loc: %lu\n", schedulerContext.uc_stack.ss_sp);
     if(schedulerContext.uc_stack.ss_sp == NULL) {
       return ENOMEM;
     }
     schedulerContext.uc_stack.ss_size=SIZE;
     makecontext(&schedulerContext, (void*)schedule, 1, arg);
 
-     printf("scheduler stack allocated\n");
+     //printf("scheduler stack allocated\n");
 
 
     //build context for main
@@ -436,13 +436,13 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     if(head==NULL) {
       return ENOMEM;
     }
-    printf("head allocated\n");
+   // printf("head allocated\n");
     head->next=(tcb*)myallocate(sizeof(tcb),__FILE__,__LINE__,0);
     if(head->next == NULL) {
       return ENOMEM;
     }
 
-    printf("head next allocated\n");
+    //printf("head next allocated\n");
     head->context=mainContext;
     head->waitId=-1;
     head->thread=i;
@@ -467,7 +467,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     if(temp == NULL) {
       return ENOMEM;
     }
-    printf("temp allocated\n");
+    //printf("temp allocated\n");
     memset(temp,0,sizeof(tcb));
     temp->next==NULL;
     if(head==NULL) {
@@ -475,7 +475,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
       temp->next==NULL;
     } else {
       while(cursor->next!=NULL) {
-        printf("Loop pthread 1\n");
+        //printf("Loop pthread 1\n");
         cursor=cursor->next;
       }
       cursor->next=temp;
@@ -492,7 +492,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     cursor=head;
     tcb* mainThread=NULL;
     while(cursor!=NULL) {
-      printf("Loop pthread 2\n");
+      //printf("Loop pthread 2\n");
       if(cursor->thread==1) {
         mainThread=cursor;
         break;
@@ -501,12 +501,12 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
       cursor=cursor->next;
     }
 
-    printf("out of loop2 \n");
+   // printf("out of loop2 \n");
 
     if(mainThread==NULL) {
       cursor=fifoHead;
       while(cursor!=NULL) {
-        printf("Loop pthread 3\n");
+      //  printf("Loop pthread 3\n");
         if(cursor->thread==1) {
           mainThread=cursor;
           break;
@@ -516,14 +516,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
      }
     }
 
-    if(mainThread==NULL) {
-      printf("main thread is null\n");
-    }
 
-    printf("main thread loc: %lu\n",mainThread);
-
-    printf("mainThread: %d\n",mainThread->thread  );
-    printf("right before swap to scheduler\n");
     //swap to scheduler
     swapcontext(&mainThread->context, &schedulerContext);
   }
@@ -609,8 +602,6 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
   //check if thread exists
   cursor=head;
   while(cursor != NULL) {
-    printf("Cursor thread: %d\n",cursor->thread);
-    printf("thread: %d\n",thread);
     if(cursor->thread==thread) {
       found=1;
     }
