@@ -8,6 +8,7 @@
 
 pthread_t *thread;
 
+
 int thread_num=32;
 
 //thread worker function
@@ -45,7 +46,7 @@ int function() {
         }
   }
 
-  //my_pthread_join(1, NULL);
+  my_pthread_join(1, NULL);
 
 }
 
@@ -55,7 +56,7 @@ int main(int argc, char const *argv[]) {
   //initialize thread_num// initialize pthread_t
         thread = (pthread_t*)malloc(thread_num*sizeof(pthread_t));
 
-  for (i = 0; i < 10; ++i){
+  for (i = 0; i < 9; ++i){
                 printf("creating thread %d\n", i);
                 pthread_create(&thread[i], NULL, &function, NULL);
                 printf("exiting thread %d\n", i);
