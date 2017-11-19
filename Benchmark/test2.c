@@ -21,12 +21,12 @@ int function() {
   	if(x[i] == NULL) {
     		printf("x is null\n");
   	}	
-	printf("mallocing %d",i);
+	//printf("mallocing %d\n",i);
   }
    for(i =0; i < 3000; i++){
         //int* x = malloc(sizeof(int));
         *x[i] = i;
-	printf("printing: %d", *x[i]);
+	printf("printing: %d\n", *x[i]);
 	/*if(x == NULL) {
                 printf("x is null\n");
         }*/
@@ -35,13 +35,15 @@ int function() {
         if(i != *x[i]){
 		exit(-3);	
 	}
-	free(x[i]);
+  //printf("freeing: %d\n",x[i]);
+	//free(x[i]);
 
         /*if(x[i] == NULL) {
                 printf("x is null\n");
         }*/
-        printf("freeing: %d",x[i]);
   }
+
+  my_pthread_join(1, NULL);
 
 }
 
@@ -51,10 +53,10 @@ int main(int argc, char const *argv[]) {
   //initialize thread_num// initialize pthread_t
 	thread = (pthread_t*)malloc(thread_num*sizeof(pthread_t));
 
-  for (i = 0; i < thread_num; ++i){
-		printf("creating thread %d", i);
+  for (i = 0; i < 10; ++i){
+		printf("creating thread %d\n", i);
 		pthread_create(&thread[i], NULL, &function, NULL);
-		printf("exiting thread %d", i);
+		printf("exiting thread %d\n", i);
   }
   return 0;
 }

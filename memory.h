@@ -39,7 +39,7 @@ static void* memory;
 //NOTE:made this void* to get rid of warnings, can be changed back if needed - Steve 11-9-2017, 9:10AM
 
 //file descriptor
-static int fd;
+//static int fd;
 
 //4096 bytes
 static int pageSize;
