@@ -112,7 +112,6 @@ int swap(pageNode* inSwap) {
 }
 
 int memAlignPages(){
-	//printf("start memalign\n");
 	int threadID = getCurrentThread();
 
 	//printf("thread id current %d\n", threadID );
@@ -501,7 +500,7 @@ void* myallocate(size_t size, char* file1, int line1, int thread) {
 
 			}
 
-			printf("returning null all pages used\n");
+			//printf("returning null all pages used\n");
 			//If all pageNodes used, no more memory to allocate
 			protectMemory();
 			inMemoryCFile=0;

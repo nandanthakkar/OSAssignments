@@ -426,7 +426,7 @@ int my_pthread_create(my_pthread_t * thread, pthread_attr_t * attr, void *(*func
     getcontext(&mainContext);
     mainContext.uc_link=&schedulerContext;
     mainContext.uc_stack.ss_sp=myallocate(SIZE,__FILE__,__LINE__,0);
-    printf("main stack loc: %lu\n",mainContext.uc_stack.ss_sp);
+    //printf("main stack loc: %lu\n",mainContext.uc_stack.ss_sp);
     if(mainContext.uc_stack.ss_sp == NULL) {
       return ENOMEM;
     }
@@ -594,6 +594,7 @@ void my_pthread_exit(void *value_ptr) {
 /**************************************************************************************/
 /* wait for thread termination */
 int my_pthread_join(my_pthread_t thread, void **value_ptr) {
+  //printf("in join\n");
   //waits for certain thread to finish
   int found=0;
   tcb* cursor=head;
@@ -667,7 +668,6 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
       prev=cursor;
       cursor=cursor->next;
   }
-
   cursor=fifoHead;
   prev=NULL;
   while(cursor!=NULL) {
@@ -702,12 +702,12 @@ int my_pthread_join(my_pthread_t thread, void **value_ptr) {
  if(current->returnValue!=NULL) {
   *value_ptr=current->returnValue;
  }
-
  //swap back to scheduler
  swapcontext(&current->context, &schedulerContext);
  if(current->returnValue != NULL) {
    *value_ptr=current->returnValue;
  }
+ //printf("return join\n");
  return 0;
 };
 
