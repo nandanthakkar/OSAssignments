@@ -1237,6 +1237,7 @@ void mydeallocate(void* address, char* file1, int line1, int thread) {
 		}
 	}
 	protectMemory();
+	inMemoryCFile=0;
 	//printf("Return from my deallocate\n");
 
 
