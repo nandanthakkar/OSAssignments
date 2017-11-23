@@ -63,7 +63,7 @@ int main(int argc, char const *argv[]) {
 //  my_pthread_yield();
   for (i = 0; i < 32; ++i){
                 printf("joining thread %d\n", i);
-                my_pthread_join(&thread[i], NULL, &function, NULL);
+                my_pthread_join(&thread[i], NULL);
                 printf("back from joined thread %d\n", i);
   }
 
